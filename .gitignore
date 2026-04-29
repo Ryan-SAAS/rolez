@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+rolez.egg-info/
+.venv/
+venv/
+.env
+.env.local
+data/
+.pytest_cache/
+.coverage
+dist/
+build/
+*.sqlite*
+.DS_Store
+node_modules/
+cli-node/dist/
+
+# Mutmut output (large, regeneratable)
+mutants/
+
+# Saac per-workstation state
+.saac/

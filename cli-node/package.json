@@ -1,0 +1,49 @@
+{
+  "name": "@startanaicompany/rolez",
+  "version": "0.1.0",
+  "description": "Agent-side CLI for the rolez role registry + provisioner at startanaicompany.com",
+  "keywords": [
+    "rolez",
+    "claude",
+    "claude-code",
+    "roles",
+    "agent",
+    "registry",
+    "cli"
+  ],
+  "homepage": "https://github.com/Ryan-SAAS/rolez#readme",
+  "bugs": {
+    "url": "https://github.com/Ryan-SAAS/rolez/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ryan-SAAS/rolez.git",
+    "directory": "cli-node"
+  },
+  "license": "MIT",
+  "author": "startanaicompany.com",
+  "type": "module",
+  "bin": {
+    "rolez": "dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "node --test --import tsx/esm test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,32 @@
+services:
+  rolez:
+    build: .
+    container_name: rolez
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql+asyncpg://rolez:rolez@db:5432/rolez
+      - TZ=Europe/Oslo
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: rolez-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=rolez
+      - POSTGRES_PASSWORD=rolez
+      - POSTGRES_DB=rolez
+      - TZ=Europe/Oslo
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rolez"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

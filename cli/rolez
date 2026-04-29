@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""rolez — agent-side CLI for the rolez registry + provisioner.
+
+Bootstrap inside an agent container:
+
+    curl -fsSL "$ROLEZ_API_URL/cli/rolez" -o /usr/local/bin/rolez && chmod +x /usr/local/bin/rolez
+
+Env vars:
+    ROLEZ_API_URL              base URL (e.g., https://rolez.startanaicompany.com)
+    ROLEZ_API_KEY              the assistant's tech.saac MCP api key
+                                (also accepts MCP_ORCHESTRATOR_API_KEY for parity
+                                 with @startanaicompany/techsaac-cli)
+
+Stdlib only — no pip dependencies.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+EXIT_OK = 0
+EXIT_USAGE = 1
+EXIT_AUTH = 2
+EXIT_NOT_FOUND = 3
+EXIT_NETWORK = 4
+EXIT_CALLER = 5  # 4xx other than auth/not-found
+
+
+def _env(name: str, fallback: str | None = None, required: bool = False) -> str:
+    v = os.environ.get(name, fallback)
+    if required and not v:
+        print(f"rolez: missing required env var {name}", file=sys.stderr)
+        sys.exit(EXIT_USAGE)
+    return v or ""
+
+
+def _api_url() -> str:
+    return _env("ROLEZ_API_URL", required=True).rstrip("/")
+
+
+def _api_key() -> str:
+    return _env("ROLEZ_API_KEY") or _env("MCP_ORCHESTRATOR_API_KEY", required=True)
+
+
+def _request(method: str, path: str, body: dict | None = None) -> tuple[int, bytes, dict]:
+    url = _api_url() + path
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Authorization", f"ApiKey {_api_key()}")
+    req.add_header("User-Agent", "rolez-cli/0.1")
+    req.add_header("Accept", "application/json")
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return resp.status, resp.read(), dict(resp.headers)
+    except urllib.error.HTTPError as e:
+        body = e.read() if hasattr(e, "read") else b""
+        return e.code, body, dict(e.headers or {})
+    except urllib.error.URLError as e:
+        print(f"rolez: network error: {e.reason}", file=sys.stderr)
+        sys.exit(EXIT_NETWORK)
+
+
+def _check(code: int, body: bytes) -> None:
+    if code == 401:
+        print("rolez: unauthorized (check ROLEZ_API_KEY / MCP_ORCHESTRATOR_API_KEY)", file=sys.stderr)
+        sys.exit(EXIT_AUTH)
+    if code == 404:
+        print(f"rolez: not found: {body.decode(errors='replace')}", file=sys.stderr)
+        sys.exit(EXIT_NOT_FOUND)
+    if 400 <= code < 500:
+        print(f"rolez: client error {code}: {body.decode(errors='replace')}", file=sys.stderr)
+        sys.exit(EXIT_CALLER)
+    if code >= 500:
+        print(f"rolez: server error {code}: {body.decode(errors='replace')}", file=sys.stderr)
+        sys.exit(EXIT_NETWORK)
+
+
+def _json_get(path: str) -> dict | list:
+    code, body, _ = _request("GET", path)
+    _check(code, body)
+    return json.loads(body.decode("utf-8"))
+
+
+def _json_post(path: str, payload: dict) -> dict:
+    code, body, _ = _request("POST", path, payload)
+    _check(code, body)
+    return json.loads(body.decode("utf-8"))
+
+
+# ---------- commands ----------------------------------------------------
+
+def cmd_list(args: argparse.Namespace) -> int:
+    qs = []
+    if args.tag:
+        qs.append(f"tag={urllib.parse.quote(args.tag)}")
+    if args.kind:
+        qs.append(f"kind={urllib.parse.quote(args.kind)}")
+    path = "/api/v1/roles" + (("?" + "&".join(qs)) if qs else "")
+    data = _json_get(path)
+    items = data.get("items", []) if isinstance(data, dict) else []
+    if args.json:
+        print(json.dumps(items, indent=2))
+        return EXIT_OK
+    if not items:
+        print("(no roles)")
+        return EXIT_OK
+    name_w = max((len(i["slug"]) for i in items), default=4)
+    ver_w = max((len(i.get("latest_version") or "-") for i in items), default=7)
+    for i in items:
+        print(
+            f"{i['slug']:<{name_w}}  {(i.get('latest_version') or '-'):<{ver_w}}  {i.get('description') or ''}"
+        )
+    return EXIT_OK
+
+
+def cmd_search(args: argparse.Namespace) -> int:
+    data = _json_get(f"/api/v1/roles/search?q={urllib.parse.quote(args.query)}")
+    items = data.get("items", []) if isinstance(data, dict) else []
+    if args.json:
+        print(json.dumps(items, indent=2))
+        return EXIT_OK
+    for i in items:
+        print(f"{i['slug']} ({i.get('latest_version') or '-'}) — {i.get('description') or ''}")
+    return EXIT_OK
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    name, version = _split_versioned(args.target)
+    path = f"/api/v1/roles/{name}"
+    if version:
+        path = f"/api/v1/roles/{name}/versions/{version}"
+    data = _json_get(path)
+    print(json.dumps(data, indent=2))
+    return EXIT_OK
+
+
+def cmd_inspect(args: argparse.Namespace) -> int:
+    """Show + briefly summarise each referenced skill/subagent."""
+    name, version = _split_versioned(args.target)
+    path = f"/api/v1/roles/{name}"
+    if version:
+        path = f"/api/v1/roles/{name}/versions/{version}"
+    data = _json_get(path)
+    manifest = data.get("manifest") if isinstance(data, dict) else None
+    if not manifest:
+        print(json.dumps(data, indent=2))
+        return EXIT_OK
+    print(f"role:    {data.get('slug', name)}@{data.get('latest_version') or version or '?'}")
+    print(f"image:   {manifest['image']['ref']}@{manifest['image']['version']}")
+    print("skills:")
+    for s in manifest.get("skills", []):
+        print(f"  - {s['name']}@{s['version']}")
+    print("subagents:")
+    for a in manifest.get("subagents", []):
+        print(f"  - {a['name']}@{a['version']}")
+    print(f"required_variables: {[v['name'] for v in manifest.get('required_variables', [])]}")
+    return EXIT_OK
+
+
+def cmd_provision(args: argparse.Namespace) -> int:
+    payload = {
+        "organization_id": args.org,
+        "product_id": args.product,
+        "name": args.name,
+        "version": args.version,
+        "variables": _kv_pairs(args.var),
+        "extra_skills": [_split_versioned_dict(x, "version") for x in (args.skill or [])],
+        "extra_subagents": [_split_versioned_dict(x, "version") for x in (args.subagent or [])],
+        "integration_bindings": [_split_binding(x) for x in (args.binding or [])],
+    }
+    out = _json_post(f"/api/v1/roles/{args.slug}/provision", payload)
+    if args.json:
+        print(json.dumps(out, indent=2))
+        return EXIT_OK
+    agent_id = out.get("agent_id") or "<no agent_id returned>"
+    print(f"provisioned {args.slug}@{out.get('role_version')} as agent {agent_id}")
+    return EXIT_OK
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    qs = f"?limit={int(args.limit)}"
+    data = _json_get("/api/admin/audit" + qs)
+    print(json.dumps(data, indent=2))
+    return EXIT_OK
+
+
+# ---------- helpers ------------------------------------------------------
+
+def _split_versioned(arg: str) -> tuple[str, str | None]:
+    if "@" in arg:
+        a, b = arg.split("@", 1)
+        return a, b
+    return arg, None
+
+
+def _split_versioned_dict(arg: str, version_key: str = "version") -> dict[str, str]:
+    name, version = _split_versioned(arg)
+    if not version:
+        raise SystemExit(f"rolez: '{arg}' must include @version")
+    return {"name": name, version_key: version}
+
+
+def _split_binding(arg: str) -> dict[str, str]:
+    if "=" not in arg:
+        raise SystemExit(f"rolez: --binding must be 'catalog_slug=connection_id', got {arg!r}")
+    catalog, conn = arg.split("=", 1)
+    return {"catalog_slug": catalog, "connection_id": conn}
+
+
+def _kv_pairs(items: list[str] | None) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for kv in items or []:
+        if "=" not in kv:
+            raise SystemExit(f"rolez: --var must be 'KEY=value', got {kv!r}")
+        k, v = kv.split("=", 1)
+        out[k] = v
+    return out
+
+
+# ---------- entrypoint ---------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="rolez", description="Role registry + provisioner CLI.")
+    sub = p.add_subparsers(dest="command", required=True)
+
+    pl = sub.add_parser("list")
+    pl.add_argument("--tag")
+    pl.add_argument("--kind", choices=["agent", "assistant"])
+    pl.add_argument("--json", action="store_true")
+    pl.set_defaults(func=cmd_list)
+
+    ps = sub.add_parser("search")
+    ps.add_argument("query")
+    ps.add_argument("--json", action="store_true")
+    ps.set_defaults(func=cmd_search)
+
+    psh = sub.add_parser("show")
+    psh.add_argument("target", help="slug[@version]")
+    psh.set_defaults(func=cmd_show)
+
+    pi = sub.add_parser("inspect")
+    pi.add_argument("target", help="slug[@version]")
+    pi.set_defaults(func=cmd_inspect)
+
+    pp = sub.add_parser("provision")
+    pp.add_argument("slug")
+    pp.add_argument("--org", required=True, help="organization_id (uuid)")
+    pp.add_argument("--product", required=True, help="product_id (uuid)")
+    pp.add_argument("--name", required=True, help="agent name")
+    pp.add_argument("--version", default="latest", help="role template version (default: latest)")
+    pp.add_argument("--var", action="append", help="KEY=value (repeatable)")
+    pp.add_argument("--skill", action="append", help="extra skill ref name@version (repeatable)")
+    pp.add_argument("--subagent", action="append", help="extra subagent ref name@version (repeatable)")
+    pp.add_argument("--binding", action="append", help="integration binding catalog=connection_id (repeatable)")
+    pp.add_argument("--json", action="store_true")
+    pp.set_defaults(func=cmd_provision)
+
+    pa = sub.add_parser("audit")
+    pa.add_argument("--limit", default=100)
+    pa.set_defaults(func=cmd_audit)
+
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        args = build_parser().parse_args(argv)
+        return args.func(args)
+    except SystemExit as e:
+        # Errors inside command handlers use sys.exit() to bail out — convert
+        # to a return code so callers (incl. tests) can inspect it.
+        if isinstance(e.code, int):
+            return e.code
+        return EXIT_USAGE
+
+
+if __name__ == "__main__":
+    sys.exit(main())
