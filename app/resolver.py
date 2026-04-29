@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.clients.agentz import AgentzClient, AgentzError, AgentzNotFound
-from app.clients.skillz import SkillzClient, SkillzError, SkillzNotFound
+from app.clients.agentz import AgentzClient, AgentzError, AgentzNotFound, AgentzUnreachable
+from app.clients.skillz import SkillzClient, SkillzError, SkillzNotFound, SkillzUnreachable
 from app.config import get_settings
 from app.validation import (
     ImageRefDraft,
@@ -13,7 +13,17 @@ from app.validation import (
 
 
 class ResolverError(Exception):
-    pass
+    """A skill/subagent reference could not be resolved.
+
+    `is_upstream_outage=True` means the upstream registry was reachable-but-broken
+    (5xx, network), as opposed to a 404 (the manifest names something that
+    doesn't exist). Callers in the admin router map this to 502 vs 422
+    respectively, so admin sees an honest signal of where the failure is.
+    """
+
+    def __init__(self, message: str, *, is_upstream_outage: bool = False):
+        super().__init__(message)
+        self.is_upstream_outage = is_upstream_outage
 
 
 def _build_skillz() -> SkillzClient:
@@ -35,6 +45,11 @@ async def _resolve_skill_version(
         data = await client.get_skill(ref.name)
     except SkillzNotFound as e:
         raise ResolverError(str(e)) from e
+    except SkillzUnreachable as e:
+        raise ResolverError(
+            f"skillz outage while resolving {ref.name!r}: {e}",
+            is_upstream_outage=True,
+        ) from e
     except SkillzError as e:
         raise ResolverError(f"failed to resolve skill {ref.name!r}: {e}") from e
     latest = data.get("latest_version")
@@ -53,6 +68,11 @@ async def _resolve_subagent_version(
         data = await client.get_agent(ref.name)
     except AgentzNotFound as e:
         raise ResolverError(str(e)) from e
+    except AgentzUnreachable as e:
+        raise ResolverError(
+            f"agentz outage while resolving {ref.name!r}: {e}",
+            is_upstream_outage=True,
+        ) from e
     except AgentzError as e:
         raise ResolverError(f"failed to resolve subagent {ref.name!r}: {e}") from e
     latest = data.get("latest_version")
@@ -63,10 +83,9 @@ async def _resolve_subagent_version(
 
 
 async def _resolve_image(image: ImageRefDraft) -> ImageRefDraft:
-    """Image resolution is deferred until tech.saac exposes a stable
-    images-by-slug surface. For now we accept `latest` and pass it through;
-    tech.saac's `create_agent` tool is responsible for picking the actual
-    image at provision time."""
+    """The image ref is forwarded verbatim — concrete digest resolution
+    happens inside tech.saac's `create_agent` tool at provision time. Rolez
+    does not (yet) consult an image catalog, so `latest` is preserved here."""
     return image
 
 

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import hmac
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
 
 from app.config import Settings, get_settings
+
+
+def token_fingerprint(token: str) -> str:
+    """Short, non-reversible identifier for a token — safe to log."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
 
 
 def extract_apikey(authorization: str | None) -> str | None:
@@ -44,5 +50,6 @@ async def require_admin_apikey(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid admin api key"
         )
-    assert token is not None
+    if token is None:  # `assert` would be stripped under -O / PYTHONOPTIMIZE.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing api key")
     return token

@@ -19,3 +19,6 @@ async def test_root_returns_metadata(client):
     assert body["endpoints"]["public"] == "/api/v1"
     assert body["endpoints"]["admin"] == "/api/admin"
     assert body["endpoints"]["cli"] == "/cli/rolez"
+    # `/metrics` is NOT advertised — there's no metrics router yet, and the
+    # root payload must not promise an endpoint that doesn't exist.
+    assert "metrics" not in body["endpoints"]

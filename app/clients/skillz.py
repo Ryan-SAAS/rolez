@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 
 
 class SkillzError(Exception):
-    pass
+    """Base error for skillz client. Carries HTTP status + decoded body so
+    callers can distinguish 4xx (manifest fault) from 5xx (upstream outage)."""
+
+    def __init__(self, message: str, status_code: int | None = None, body: Any = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.body = body
 
 
 class SkillzNotFound(SkillzError):
-    pass
+    """The requested skill does not exist upstream (404)."""
+
+
+class SkillzUnreachable(SkillzError):
+    """Network failure or 5xx — caller should treat as upstream outage."""
 
 
 class SkillzClient:
@@ -26,10 +38,30 @@ class SkillzClient:
 
     async def get_skill(self, name: str) -> dict:
         url = f"{self.base_url}/api/v1/skills/{name}"
-        async with httpx.AsyncClient(timeout=self.timeout) as http:
-            resp = await http.get(url, headers=self._headers())
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as http:
+                resp = await http.get(url, headers=self._headers())
+        except httpx.HTTPError as e:
+            raise SkillzUnreachable(f"skillz unreachable: {e}") from e
         if resp.status_code == 404:
-            raise SkillzNotFound(f"skill {name!r} not found upstream")
-        if resp.status_code >= 400:
-            raise SkillzError(f"skillz returned {resp.status_code}: {resp.text}")
+            raise SkillzNotFound(f"skill {name!r} not found upstream", status_code=404)
+        if 400 <= resp.status_code < 500:
+            raise SkillzError(
+                f"skillz returned {resp.status_code}: {resp.text}",
+                status_code=resp.status_code,
+                body=_safe_body(resp),
+            )
+        if resp.status_code >= 500:
+            raise SkillzUnreachable(
+                f"skillz returned {resp.status_code}",
+                status_code=resp.status_code,
+                body=_safe_body(resp),
+            )
         return resp.json()
+
+
+def _safe_body(resp: httpx.Response) -> Any:
+    try:
+        return resp.json()
+    except (ValueError, httpx.DecodingError):
+        return resp.text

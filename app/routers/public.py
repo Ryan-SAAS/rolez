@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -8,7 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth import extract_apikey
+from app.auth import extract_apikey, token_fingerprint
 from app.db import get_session
 from app.models import RoleTemplate, RoleTemplateVersion
 from app.provisioner import ProvisionError, provision
@@ -16,6 +17,12 @@ from app.schemas import ProvisionIn, RoleListOut, RoleOut, RoleVersionOut
 from app.upstream_auth import UpstreamUnreachable, verify_token
 
 router = APIRouter(prefix="/api/v1", tags=["public"])
+
+log = logging.getLogger(__name__)
+
+
+def _select_role_with_versions():
+    return select(RoleTemplate).options(selectinload(RoleTemplate.versions))
 
 
 async def require_caller_token(
@@ -31,11 +38,15 @@ async def require_caller_token(
     try:
         ok = await verify_token(token)
     except UpstreamUnreachable as e:
+        # Log the detail server-side; do NOT echo upstream URLs / connect-error
+        # internals to unauthenticated callers.
+        log.error("upstream auth probe failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"upstream auth unavailable: {e}",
+            detail="upstream auth unavailable",
         )
     if not ok:
+        log.info("upstream rejected token fp=%s", token_fingerprint(token))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid api key",
@@ -76,22 +87,16 @@ async def list_roles(
     kind: str | None = Query(default=None),
     q: str | None = Query(default=None),
 ) -> RoleListOut:
-    stmt = (
-        select(RoleTemplate)
-        .options(selectinload(RoleTemplate.versions))
-        .where(RoleTemplate.deleted_at.is_(None))
-    )
+    stmt = _select_role_with_versions().where(RoleTemplate.deleted_at.is_(None))
     if kind:
         stmt = stmt.where(RoleTemplate.kind == kind)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(RoleTemplate.slug.ilike(like), RoleTemplate.description.ilike(like)))
     rows = (await session.execute(stmt.order_by(RoleTemplate.slug))).scalars().all()
-    items = []
-    for r in rows:
-        if tag and tag not in (r.tags or []):
-            continue
-        items.append(_to_role_out(r))
+    if tag:
+        rows = [r for r in rows if tag in (r.tags or [])]
+    items = [_to_role_out(r) for r in rows]
     return RoleListOut(total=len(items), items=items)
 
 
@@ -103,8 +108,7 @@ async def search_roles(
 ) -> RoleListOut:
     like = f"%{q}%"
     stmt = (
-        select(RoleTemplate)
-        .options(selectinload(RoleTemplate.versions))
+        _select_role_with_versions()
         .where(
             RoleTemplate.deleted_at.is_(None),
             or_(RoleTemplate.slug.ilike(like), RoleTemplate.description.ilike(like)),
@@ -123,9 +127,9 @@ async def show_role(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     role = await session.scalar(
-        select(RoleTemplate)
-        .options(selectinload(RoleTemplate.versions))
-        .where(RoleTemplate.slug == slug, RoleTemplate.deleted_at.is_(None))
+        _select_role_with_versions().where(
+            RoleTemplate.slug == slug, RoleTemplate.deleted_at.is_(None)
+        )
     )
     if role is None:
         raise HTTPException(status_code=404, detail="role not found")
@@ -159,9 +163,9 @@ async def show_role_version(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     role = await session.scalar(
-        select(RoleTemplate)
-        .options(selectinload(RoleTemplate.versions))
-        .where(RoleTemplate.slug == slug, RoleTemplate.deleted_at.is_(None))
+        _select_role_with_versions().where(
+            RoleTemplate.slug == slug, RoleTemplate.deleted_at.is_(None)
+        )
     )
     if role is None:
         raise HTTPException(status_code=404, detail="role not found")

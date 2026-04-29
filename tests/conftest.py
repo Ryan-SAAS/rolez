@@ -10,8 +10,6 @@ import pytest
 _TMP_ROOT = Path(tempfile.mkdtemp(prefix="rolez-test-"))
 os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TMP_ROOT}/db.sqlite3")
 os.environ.setdefault("ROLEZ_ADMIN_API_KEY", "test-admin-api-key")
-os.environ.setdefault("METRICS_USER", "metrics")
-os.environ.setdefault("METRICS_PASS", "metrics-pass")
 os.environ.setdefault("ADMIN_ALLOWED_ORIGINS", "https://tech.startanaicompany.com")
 os.environ.setdefault("ROLEZ_PUBLIC_URL", "http://testserver")
 os.environ.setdefault("SKILLZ_API_URL", "https://skillz.example")

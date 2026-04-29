@@ -168,8 +168,38 @@ async def test_resolver_skillz_5xx_error_mapped():
         subagents=[],
         context_files=[],
     )
-    with pytest.raises(ResolverError):
+    with pytest.raises(ResolverError) as ei:
         await resolve_draft(draft)
+    assert ei.value.is_upstream_outage is True
+
+
+@respx.mock
+async def test_resolver_agentz_5xx_marked_as_outage():
+    respx.get("https://agentz.example/api/v1/agents/y").mock(
+        return_value=httpx.Response(503)
+    )
+    draft = RoleManifestDraft(
+        image={"ref": "saac/x", "version": "1.0.0"},
+        identity={"name": "x"},
+        skills=[],
+        subagents=[{"name": "y", "version": "latest"}],
+        context_files=[],
+    )
+    with pytest.raises(ResolverError) as ei:
+        await resolve_draft(draft)
+    assert ei.value.is_upstream_outage is True
+
+
+@respx.mock
+async def test_admin_create_resolver_outage_502(client, admin_headers):
+    """Admin POSTs a draft, skillz is down → 502 (NOT 422)."""
+    respx.get("https://skillz.example/api/v1/skills/down-skill").mock(
+        return_value=httpx.Response(503)
+    )
+    body = _admin_seed_body("down-agent")
+    body["manifest"]["skills"] = [{"name": "down-skill", "version": "latest"}]
+    resp = await client.post("/api/admin/roles", headers=admin_headers, json=body)
+    assert resp.status_code == 502, resp.text
 
 
 @respx.mock
@@ -223,22 +253,66 @@ async def test_resolver_agentz_missing_latest_version_field_errors():
 # --- client error mapping ----------------------------------------------
 
 @respx.mock
-async def test_skillz_5xx_raises_generic_error():
+async def test_skillz_5xx_raises_unreachable():
+    from app.clients.skillz import SkillzUnreachable
     respx.get("https://skillz.example/api/v1/skills/x").mock(
         return_value=httpx.Response(503, json={"error": "boom"})
     )
     c = SkillzClient(base_url="https://skillz.example", token="t")
-    with pytest.raises(SkillzError):
+    with pytest.raises(SkillzUnreachable) as ei:
+        await c.get_skill("x")
+    assert ei.value.status_code == 503
+
+
+@respx.mock
+async def test_skillz_4xx_raises_skillz_error():
+    respx.get("https://skillz.example/api/v1/skills/x").mock(
+        return_value=httpx.Response(400, json={"detail": "bad request"})
+    )
+    c = SkillzClient(base_url="https://skillz.example", token="t")
+    with pytest.raises(SkillzError) as ei:
+        await c.get_skill("x")
+    assert ei.value.status_code == 400
+
+
+@respx.mock
+async def test_skillz_network_error_raises_unreachable():
+    from app.clients.skillz import SkillzUnreachable
+    respx.get("https://skillz.example/api/v1/skills/x").mock(side_effect=httpx.ConnectError("boom"))
+    c = SkillzClient(base_url="https://skillz.example", token="t")
+    with pytest.raises(SkillzUnreachable):
         await c.get_skill("x")
 
 
 @respx.mock
-async def test_agentz_5xx_raises_generic_error():
+async def test_agentz_5xx_raises_unreachable():
+    from app.clients.agentz import AgentzUnreachable
     respx.get("https://agentz.example/api/v1/agents/x").mock(
         return_value=httpx.Response(503)
     )
     c = AgentzClient(base_url="https://agentz.example", token="t")
-    with pytest.raises(AgentzError):
+    with pytest.raises(AgentzUnreachable) as ei:
+        await c.get_agent("x")
+    assert ei.value.status_code == 503
+
+
+@respx.mock
+async def test_agentz_4xx_raises_agentz_error():
+    respx.get("https://agentz.example/api/v1/agents/x").mock(
+        return_value=httpx.Response(400)
+    )
+    c = AgentzClient(base_url="https://agentz.example", token="t")
+    with pytest.raises(AgentzError) as ei:
+        await c.get_agent("x")
+    assert ei.value.status_code == 400
+
+
+@respx.mock
+async def test_agentz_network_error_raises_unreachable():
+    from app.clients.agentz import AgentzUnreachable
+    respx.get("https://agentz.example/api/v1/agents/x").mock(side_effect=httpx.ConnectError("boom"))
+    c = AgentzClient(base_url="https://agentz.example", token="t")
+    with pytest.raises(AgentzUnreachable):
         await c.get_agent("x")
 
 

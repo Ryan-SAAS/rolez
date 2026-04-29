@@ -26,9 +26,6 @@ class Settings(BaseSettings):
         alias="ADMIN_ALLOWED_ORIGINS",
     )
 
-    metrics_user: str = Field(default="metrics", alias="METRICS_USER")
-    metrics_pass: str = Field(default="change-me", alias="METRICS_PASS")
-
     skillz_api_url: str = Field(default="https://skillz.startanaicompany.com", alias="SKILLZ_API_URL")
     skillz_token: str = Field(default="", alias="SKILLZ_TOKEN")
     agentz_api_url: str = Field(default="https://agentz.startanaicompany.com", alias="AGENTZ_API_URL")

@@ -139,3 +139,83 @@ def test_cli_missing_env_errors(monkeypatch, capsys):
     assert rc != 0
     err = capsys.readouterr().err
     assert "ROLEZ_API_URL" in err or "api url" in err.lower()
+
+
+def test_cli_search(cli, capsys):
+    body = {"total": 2, "items": [
+        {"slug": "support-agent", "latest_version": "0.1.0", "description": "Handles tickets"},
+        {"slug": "support-pdf", "latest_version": "0.2.0", "description": "PDF flow"},
+    ]}
+    with patch("urllib.request.urlopen", return_value=_mock_resp(200, body)):
+        rc = cli.main(["search", "support"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "support-agent" in out
+    assert "support-pdf" in out
+
+
+def test_cli_inspect_renders_summary(cli, capsys):
+    """`inspect` must print image, skills, subagents, required_variables names."""
+    body = {
+        "slug": "support-agent",
+        "latest_version": "0.1.0",
+        "manifest": {
+            "image": {"ref": "saac/support-agent", "version": "1.4.0"},
+            "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
+            "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
+            "required_variables": [{"name": "SUPPORT_CHANNEL", "description": "..."}],
+        },
+    }
+    with patch("urllib.request.urlopen", return_value=_mock_resp(200, body)):
+        rc = cli.main(["inspect", "support-agent"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "saac/support-agent@1.4.0" in out
+    assert "pdf-generator@1.2.3" in out
+    assert "code-reviewer@0.5.0" in out
+    assert "SUPPORT_CHANNEL" in out
+
+
+def test_cli_inspect_falls_back_to_raw_when_manifest_missing(cli, capsys):
+    body = {"slug": "x", "latest_version": "1.0.0"}  # no manifest field
+    with patch("urllib.request.urlopen", return_value=_mock_resp(200, body)):
+        rc = cli.main(["inspect", "x"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "x" in out
+
+
+def test_cli_provision_rejects_skill_without_version(cli):
+    """Malformed --skill arg without @version should exit usage, not crash."""
+    rc = cli.main([
+        "provision", "support-agent",
+        "--org", "o", "--product", "p", "--name", "n",
+        "--skill", "no-version-here",
+    ])
+    assert rc != 0
+
+
+def test_cli_provision_rejects_var_without_equals(cli):
+    rc = cli.main([
+        "provision", "support-agent",
+        "--org", "o", "--product", "p", "--name", "n",
+        "--var", "MISSING_EQUALS",
+    ])
+    assert rc != 0
+
+
+def test_cli_provision_rejects_binding_without_equals(cli):
+    rc = cli.main([
+        "provision", "support-agent",
+        "--org", "o", "--product", "p", "--name", "n",
+        "--binding", "no-equals",
+    ])
+    assert rc != 0
+
+
+def test_cli_no_audit_command(cli):
+    """The audit command was removed because the endpoint never existed.
+    Confirm argparse rejects it so we don't accidentally re-introduce a
+    broken command."""
+    rc = cli.main(["audit"])
+    assert rc != 0

@@ -17,6 +17,35 @@ function authHeaders(cfg: Config): Record<string, string> {
   };
 }
 
+// Exposed for unit tests; not part of the public CLI API surface.
+export function _describeFetchError_forTesting(err: unknown): string {
+  return describeFetchError(err);
+}
+
+function describeFetchError(err: unknown): string {
+  // Node 18+ fetch puts the actual underlying socket / DNS / cert error in
+  // `err.cause` while `err.message` is the unhelpful "fetch failed". Surface
+  // both so users have something to act on.
+  let msg = err instanceof Error ? err.message : String(err);
+  if (err instanceof Error && "cause" in err && err.cause) {
+    const cause = err.cause;
+    const causeMsg = cause instanceof Error ? cause.message : String(cause);
+    if (causeMsg && !msg.includes(causeMsg)) {
+      msg += ` (cause: ${causeMsg})`;
+    }
+  }
+  return msg;
+}
+
+async function readBodySafe(resp: Response): Promise<string> {
+  try {
+    return await resp.text();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `<body read failed: ${msg}>`;
+  }
+}
+
 async function request(
   cfg: Config,
   path: string,
@@ -34,8 +63,7 @@ async function request(
       },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    die(EXIT_NETWORK, `network error: ${msg}`);
+    die(EXIT_NETWORK, `network error: ${describeFetchError(err)}`);
   }
   if (resp.status === 401) {
     die(EXIT_AUTH, "unauthorized (check ROLEZ_API_KEY / MCP_ORCHESTRATOR_API_KEY)");
@@ -44,12 +72,10 @@ async function request(
     die(EXIT_NOT_FOUND, `not found: ${path}`);
   }
   if (resp.status >= 400 && resp.status < 500) {
-    const body = await resp.text().catch(() => "");
-    die(EXIT_CALLER, `client error ${resp.status}: ${body}`);
+    die(EXIT_CALLER, `client error ${resp.status}: ${await readBodySafe(resp)}`);
   }
   if (!resp.ok) {
-    const body = await resp.text().catch(() => "");
-    die(EXIT_NETWORK, `server error ${resp.status}: ${body}`);
+    die(EXIT_NETWORK, `server error ${resp.status}: ${await readBodySafe(resp)}`);
   }
   return resp;
 }

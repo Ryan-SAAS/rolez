@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from app.auth import extract_apikey, require_admin_apikey
+from app.auth import extract_apikey
 from app.config import get_settings
 
 
@@ -22,12 +22,11 @@ def test_extract_apikey_returns_none_for_missing_or_malformed():
 
 
 async def test_admin_apikey_constant_time_match():
-    settings = get_settings()
-    assert require_admin_apikey.__name__  # sanity import
-
-    # Direct verification via module function (no FastAPI to avoid coupling here):
+    """Exercise the matcher directly — the FastAPI dependency wrapper is
+    covered by the public/admin router tests."""
     from app.auth import _admin_apikey_matches
 
+    settings = get_settings()
     assert _admin_apikey_matches(settings.rolez_admin_api_key) is True
     assert _admin_apikey_matches(settings.rolez_admin_api_key + "x") is False
     assert _admin_apikey_matches("") is False

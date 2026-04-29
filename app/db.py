@@ -36,7 +36,10 @@ def get_engine():
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
     if _session_factory is None:
         get_engine()
-    assert _session_factory is not None
+    if _session_factory is None:  # noqa: RUF034 — `assert` is stripped under -O
+        raise RuntimeError(
+            "session factory not initialized — get_engine() did not set it"
+        )
     return _session_factory
 
 

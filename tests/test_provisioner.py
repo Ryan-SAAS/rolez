@@ -240,3 +240,128 @@ async def test_provision_404_when_role_unknown(client, agent_headers):
         json={"organization_id": "o", "product_id": "p", "name": "n", "variables": {}},
     )
     assert resp.status_code == 404
+
+
+@respx.mock
+async def test_provision_502_when_techsaac_returns_no_agent_id(client, admin_headers, agent_headers):
+    """If tech.saac responds 200 but neither {agent_id} nor {agent: {id}} is
+    present, treat as protocol drift — record + 502, don't pretend it succeeded."""
+    def handler(request):
+        body = json.loads(request.content)
+        if body["method"] == "tools/list":
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": body["id"], "result": {"tools": []}})
+        return httpx.Response(200, json={
+            "jsonrpc": "2.0", "id": body["id"],
+            "result": {"status": "starting", "queue_position": 1},  # NO agent_id
+        })
+
+    respx.post("https://techsaac.example/api/mcp").mock(side_effect=handler)
+    await client.post("/api/admin/roles", headers=admin_headers, json=_draft_body())
+
+    resp = await client.post(
+        "/api/v1/roles/support-agent/provision",
+        headers=agent_headers,
+        json={
+            "organization_id": "o", "product_id": "p", "name": "support-eu",
+            "variables": {"SUPPORT_CHANNEL": "#x"},
+        },
+    )
+    assert resp.status_code == 502, resp.text
+
+    from app.db import get_session_factory
+    from app.models import ProvisionEvent
+    factory = get_session_factory()
+    async with factory() as s:
+        row = (await s.execute(select(ProvisionEvent))).scalar_one()
+        assert row.status == 502
+        assert row.agent_id_returned is None
+        assert row.error and "agent id" in row.error.lower()
+
+
+@respx.mock
+async def test_provision_503_when_techsaac_unreachable(client, admin_headers, agent_headers):
+    """A valid token in the cache + an unreachable upstream → 503 with a
+    provision_event recorded so the audit log captures the outage."""
+    # First, prime the upstream-auth cache with a valid token result so the
+    # request gets past the auth check.
+    from app.upstream_auth import _CACHE, _CacheEntry, _key
+    import time as _time
+    _CACHE[_key("test-assistant-mcp-token")] = _CacheEntry(
+        valid=True, expires_at=_time.monotonic() + 60
+    )
+
+    # Make the create_agent call itself unreachable.
+    respx.post("https://techsaac.example/api/mcp").mock(side_effect=httpx.ConnectError("boom"))
+
+    await client.post("/api/admin/roles", headers=admin_headers, json=_draft_body())
+    resp = await client.post(
+        "/api/v1/roles/support-agent/provision",
+        headers=agent_headers,
+        json={
+            "organization_id": "o", "product_id": "p", "name": "support-eu",
+            "variables": {"SUPPORT_CHANNEL": "#x"},
+        },
+    )
+    assert resp.status_code == 503
+
+    from app.db import get_session_factory
+    from app.models import ProvisionEvent
+    factory = get_session_factory()
+    async with factory() as s:
+        row = (await s.execute(select(ProvisionEvent))).scalar_one()
+        assert row.status == 503
+
+
+@respx.mock
+async def test_provision_502_when_techsaac_returns_jsonrpc_error(client, admin_headers, agent_headers):
+    """JSON-RPC error in a 200 response → 502 (we can't trust upstream's intent)."""
+    def handler(request):
+        body = json.loads(request.content)
+        if body["method"] == "tools/list":
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": body["id"], "result": {}})
+        return httpx.Response(200, json={
+            "jsonrpc": "2.0", "id": body["id"],
+            "error": {"code": -32603, "message": "internal tool error"},
+        })
+
+    respx.post("https://techsaac.example/api/mcp").mock(side_effect=handler)
+    await client.post("/api/admin/roles", headers=admin_headers, json=_draft_body())
+
+    resp = await client.post(
+        "/api/v1/roles/support-agent/provision",
+        headers=agent_headers,
+        json={
+            "organization_id": "o", "product_id": "p", "name": "support-eu",
+            "variables": {"SUPPORT_CHANNEL": "#x"},
+        },
+    )
+    assert resp.status_code == 502
+
+
+@respx.mock
+async def test_provision_404_when_only_version_was_deleted(client, admin_headers, agent_headers):
+    """Create a role, delete its only version, then attempt to provision.
+    Should 404 and NOT write a provision_event (resolution failed before
+    any tech.saac call)."""
+    respx.post("https://techsaac.example/api/mcp").mock(
+        return_value=httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"tools": []}})
+    )
+    await client.post("/api/admin/roles", headers=admin_headers, json=_draft_body())
+    await client.delete("/api/admin/roles/support-agent/versions/0.1.0", headers=admin_headers)
+
+    resp = await client.post(
+        "/api/v1/roles/support-agent/provision",
+        headers=agent_headers,
+        json={
+            "organization_id": "o", "product_id": "p", "name": "support-eu",
+            "variables": {"SUPPORT_CHANNEL": "#x"},
+        },
+    )
+    assert resp.status_code == 404
+
+    from app.db import get_session_factory
+    from app.models import ProvisionEvent
+    factory = get_session_factory()
+    async with factory() as s:
+        rows = (await s.execute(select(ProvisionEvent))).scalars().all()
+        assert rows == []

@@ -28,7 +28,7 @@ EXIT_USAGE = 1
 EXIT_AUTH = 2
 EXIT_NOT_FOUND = 3
 EXIT_NETWORK = 4
-EXIT_CALLER = 5  # 4xx other than auth/not-found
+EXIT_CALLER = 5
 
 
 def _env(name: str, fallback: str | None = None, required: bool = False) -> str:
@@ -60,7 +60,13 @@ def _request(method: str, path: str, body: dict | None = None) -> tuple[int, byt
         with urllib.request.urlopen(req, timeout=60) as resp:
             return resp.status, resp.read(), dict(resp.headers)
     except urllib.error.HTTPError as e:
-        body = e.read() if hasattr(e, "read") else b""
+        # IncompleteRead can fire if the connection drops mid-body during a
+        # 5xx — fall back to a placeholder so the user still gets a clean
+        # exit message instead of a Python traceback.
+        try:
+            body = e.read() if hasattr(e, "read") else b""
+        except Exception as read_err:  # noqa: BLE001 — surface a useful diagnostic
+            body = f"<could not read response body: {read_err}>".encode()
         return e.code, body, dict(e.headers or {})
     except urllib.error.URLError as e:
         print(f"rolez: network error: {e.reason}", file=sys.stderr)
@@ -184,13 +190,6 @@ def cmd_provision(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def cmd_audit(args: argparse.Namespace) -> int:
-    qs = f"?limit={int(args.limit)}"
-    data = _json_get("/api/admin/audit" + qs)
-    print(json.dumps(data, indent=2))
-    return EXIT_OK
-
-
 # ---------- helpers ------------------------------------------------------
 
 def _split_versioned(arg: str) -> tuple[str, str | None]:
@@ -261,10 +260,6 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--binding", action="append", help="integration binding catalog=connection_id (repeatable)")
     pp.add_argument("--json", action="store_true")
     pp.set_defaults(func=cmd_provision)
-
-    pa = sub.add_parser("audit")
-    pa.add_argument("--limit", default=100)
-    pa.set_defaults(func=cmd_audit)
 
     return p
 

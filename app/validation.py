@@ -12,6 +12,11 @@ SEMVER_RE = re.compile(
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
+# OCI-style image reference: registry/path/name with optional ":tag".
+# Permits the slash-separated namespacing tech.saac uses (saac/support-agent).
+# Allows a-z 0-9 . _ - / and an optional :tag suffix. No spaces, no control
+# characters, no backslashes.
+IMAGE_REF_RE = re.compile(r"^[a-z0-9][a-z0-9._\-/]{0,253}(?::[A-Za-z0-9._\-]{1,128})?$")
 
 
 def validate_slug(slug: str) -> None:
@@ -22,6 +27,13 @@ def validate_slug(slug: str) -> None:
 def validate_version(version: str) -> None:
     if not isinstance(version, str) or not SEMVER_RE.match(version):
         raise ValueError(f"invalid semver version {version!r}")
+
+
+def validate_image_ref(ref: str) -> None:
+    if not isinstance(ref, str) or not IMAGE_REF_RE.match(ref):
+        raise ValueError(
+            f"invalid image ref {ref!r}: must match {IMAGE_REF_RE.pattern}"
+        )
 
 
 def _validate_name_field(v: str) -> str:
@@ -70,6 +82,12 @@ class ImageRef(BaseModel):
     ref: str
     version: str
 
+    @field_validator("ref")
+    @classmethod
+    def _vref(cls, v: str) -> str:
+        validate_image_ref(v)
+        return v
+
     @field_validator("version")
     @classmethod
     def _vver(cls, v: str) -> str:
@@ -103,6 +121,12 @@ class ImageRefDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
     ref: str
     version: str = "latest"
+
+    @field_validator("ref")
+    @classmethod
+    def _vref(cls, v: str) -> str:
+        validate_image_ref(v)
+        return v
 
     @field_validator("version")
     @classmethod
@@ -174,7 +198,15 @@ class ContextFile(BaseModel):
             raise ValueError("context_files[].path must be non-empty")
         if v.startswith("/"):
             raise ValueError("context_files[].path must be relative")
-        if ".." in v.split("/"):
+        if "\\" in v:
+            raise ValueError("context_files[].path must not contain backslashes")
+        if "\x00" in v:
+            raise ValueError("context_files[].path must not contain NUL")
+        if len(v) >= 2 and v[1] == ":":
+            # Reject Windows-style absolute paths like "C:\..." or "C:/...".
+            raise ValueError("context_files[].path must be relative (no drive letter)")
+        parts = v.split("/")
+        if any(p == ".." for p in parts):
             raise ValueError("context_files[].path must not contain '..' segments")
         return v
 
