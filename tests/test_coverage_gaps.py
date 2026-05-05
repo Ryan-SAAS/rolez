@@ -12,7 +12,6 @@ import respx
 
 from app.clients.agentz import AgentzClient, AgentzError
 from app.clients.skillz import SkillzClient, SkillzError
-from app.clients.techsaac import TechsaacClient, TechsaacError
 from app.config import Settings
 from app.resolver import ResolverError, resolve_draft
 from app.validation import RoleManifestDraft
@@ -115,26 +114,6 @@ async def test_admin_delete_version_404_when_version_unknown(client, admin_heade
 @respx.mock
 async def test_admin_show_404_when_unknown(client, admin_headers):
     resp = await client.get("/api/admin/roles/nope", headers=admin_headers)
-    assert resp.status_code == 404
-
-
-# --- provisioner: explicit version not found ----------------------------
-
-@respx.mock
-async def test_provision_404_when_version_unknown(client, admin_headers, agent_headers):
-    respx.post("https://techsaac.example/api/mcp").mock(
-        return_value=httpx.Response(200, json={"result": {}})
-    )
-    await client.post("/api/admin/roles", headers=admin_headers, json=_admin_seed_body())
-    resp = await client.post(
-        "/api/v1/roles/support-agent/provision",
-        headers=agent_headers,
-        json={
-            "organization_id": "o", "product_id": "p", "name": "n",
-            "variables": {"SUPPORT_CHANNEL": "#x"},
-            "version": "9.9.9",
-        },
-    )
     assert resp.status_code == 404
 
 
@@ -316,36 +295,6 @@ async def test_agentz_network_error_raises_unreachable():
         await c.get_agent("x")
 
 
-@respx.mock
-async def test_techsaac_network_error_unreachable():
-    respx.post("https://techsaac.example/api/mcp").mock(
-        side_effect=httpx.ConnectError("boom")
-    )
-    c = TechsaacClient(base_url="https://techsaac.example/api/mcp")
-    with pytest.raises(TechsaacError, match="unreachable"):
-        await c.call_tool("x", {}, caller_token="t")
-
-
-@respx.mock
-async def test_techsaac_non_json_body_raises():
-    respx.post("https://techsaac.example/api/mcp").mock(
-        return_value=httpx.Response(200, text="not json", headers={"content-type": "text/plain"})
-    )
-    c = TechsaacClient(base_url="https://techsaac.example/api/mcp")
-    with pytest.raises(TechsaacError, match="non-JSON"):
-        await c.call_tool("x", {}, caller_token="t")
-
-
-@respx.mock
-async def test_techsaac_safe_body_falls_back_to_text_when_not_json():
-    respx.post("https://techsaac.example/api/mcp").mock(
-        return_value=httpx.Response(401, text="plain text body")
-    )
-    c = TechsaacClient(base_url="https://techsaac.example/api/mcp")
-    with pytest.raises(TechsaacError) as ei:
-        await c.call_tool("x", {}, caller_token="t")
-    # _safe_body should have read the text body without throwing
-    assert ei.value.body == "plain text body" or "plain text body" in str(ei.value.body)
 
 
 # --- config: postgresql:// rewriting -----------------------------------
@@ -406,16 +355,6 @@ def _admin_seed_body(slug: str = "support-agent") -> dict:
             "identity": {"name": slug},
             "skills": [],
             "subagents": [],
-            "tools": {"allow": [], "disallow": []},
-            "mcp_servers": [],
-            "prompts": [],
-            "inputs": [],
-            "outputs": [],
-            "consumed_integrations": [],
-            "required_variables": [{"name": "SUPPORT_CHANNEL", "description": "..."}],
-            "communication_rules": {
-                "can_dm": [], "receives_dm": [], "listens_to": [], "posts_to": [],
-            },
             "context_files": [],
         },
     }

@@ -145,69 +145,34 @@ class Identity(BaseModel):
     description: str | None = None
 
 
-class Tools(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    allow: list[str] = Field(default_factory=list)
-    disallow: list[str] = Field(default_factory=list)
-
-
-class Prompt(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    name: str
-    body: str
-    trigger_source: str | None = None
-    trigger_config: dict = Field(default_factory=dict)
-
-
-class IOEdge(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    channel: str
-    capability: str | None = None
-
-
-class ConsumedIntegration(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    catalog_slug: str
-    env_needed: list[str] = Field(default_factory=list)
-
-
-class RequiredVariable(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    description: str | None = None
-    default: str | None = None
-
-
-class CommunicationRules(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    can_dm: list[str] = Field(default_factory=list)
-    receives_dm: list[str] = Field(default_factory=list)
-    listens_to: list[str] = Field(default_factory=list)
-    posts_to: list[str] = Field(default_factory=list)
-
-
 class ContextFile(BaseModel):
+    """A single context file the role contributes. Mapped at provision time
+    to tech.saac's update_agent_context shape:
+      - name == "CLAUDE.md"        → claude_md.content
+      - name == "HIVE-RULES.md"    → hive_rules_md.content
+      - everything else            → custom_files[]
+    """
+
     model_config = ConfigDict(extra="forbid")
-    path: str
+    name: str
     content: str
 
-    @field_validator("path")
+    @field_validator("name")
     @classmethod
-    def _safe_path(cls, v: str) -> str:
+    def _safe_name(cls, v: str) -> str:
         if not v:
-            raise ValueError("context_files[].path must be non-empty")
+            raise ValueError("context_files[].name must be non-empty")
         if v.startswith("/"):
-            raise ValueError("context_files[].path must be relative")
+            raise ValueError("context_files[].name must be relative")
         if "\\" in v:
-            raise ValueError("context_files[].path must not contain backslashes")
+            raise ValueError("context_files[].name must not contain backslashes")
         if "\x00" in v:
-            raise ValueError("context_files[].path must not contain NUL")
+            raise ValueError("context_files[].name must not contain NUL")
         if len(v) >= 2 and v[1] == ":":
-            # Reject Windows-style absolute paths like "C:\..." or "C:/...".
-            raise ValueError("context_files[].path must be relative (no drive letter)")
+            raise ValueError("context_files[].name must be relative (no drive letter)")
         parts = v.split("/")
         if any(p == ".." for p in parts):
-            raise ValueError("context_files[].path must not contain '..' segments")
+            raise ValueError("context_files[].name must not contain '..' segments")
         return v
 
 
@@ -215,16 +180,14 @@ class ContextFile(BaseModel):
 
 
 class _RoleManifestBase(BaseModel):
+    """Rolez owns the recruiting brief: image, identity, skills, subagents,
+    and the role-specific context that gets appended to tech.saac's default.
+    Everything else (tools, prompts, inputs/outputs, integrations,
+    variables, communication rules) is tech.saac's concern, controlled via
+    its admin UI — not part of the role manifest."""
+
     model_config = ConfigDict(extra="ignore")
     identity: Identity
-    tools: Tools = Field(default_factory=Tools)
-    mcp_servers: list[str] = Field(default_factory=list)
-    prompts: list[Prompt] = Field(default_factory=list)
-    inputs: list[IOEdge] = Field(default_factory=list)
-    outputs: list[IOEdge] = Field(default_factory=list)
-    consumed_integrations: list[ConsumedIntegration] = Field(default_factory=list)
-    required_variables: list[RequiredVariable] = Field(default_factory=list)
-    communication_rules: CommunicationRules = Field(default_factory=CommunicationRules)
     context_files: list[ContextFile] = Field(default_factory=list)
 
 

@@ -94,12 +94,6 @@ def _json_get(path: str) -> dict | list:
     return json.loads(body.decode("utf-8"))
 
 
-def _json_post(path: str, payload: dict) -> dict:
-    code, body, _ = _request("POST", path, payload)
-    _check(code, body)
-    return json.loads(body.decode("utf-8"))
-
-
 # ---------- commands ----------------------------------------------------
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -158,35 +152,15 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     if not manifest:
         print(json.dumps(data, indent=2))
         return EXIT_OK
-    print(f"role:    {data.get('slug', name)}@{data.get('latest_version') or version or '?'}")
-    print(f"image:   {manifest['image']['ref']}@{manifest['image']['version']}")
+    print(f"role:      {data.get('slug', name)}@{data.get('latest_version') or version or '?'}")
+    print(f"image:     {manifest['image']['ref']}@{manifest['image']['version']}")
     print("skills:")
     for s in manifest.get("skills", []):
         print(f"  - {s['name']}@{s['version']}")
     print("subagents:")
     for a in manifest.get("subagents", []):
         print(f"  - {a['name']}@{a['version']}")
-    print(f"required_variables: {[v['name'] for v in manifest.get('required_variables', [])]}")
-    return EXIT_OK
-
-
-def cmd_provision(args: argparse.Namespace) -> int:
-    payload = {
-        "organization_id": args.org,
-        "product_id": args.product,
-        "name": args.name,
-        "version": args.version,
-        "variables": _kv_pairs(args.var),
-        "extra_skills": [_split_versioned_dict(x, "version") for x in (args.skill or [])],
-        "extra_subagents": [_split_versioned_dict(x, "version") for x in (args.subagent or [])],
-        "integration_bindings": [_split_binding(x) for x in (args.binding or [])],
-    }
-    out = _json_post(f"/api/v1/roles/{args.slug}/provision", payload)
-    if args.json:
-        print(json.dumps(out, indent=2))
-        return EXIT_OK
-    agent_id = out.get("agent_id") or "<no agent_id returned>"
-    print(f"provisioned {args.slug}@{out.get('role_version')} as agent {agent_id}")
+    print(f"context_files: {[f['name'] for f in manifest.get('context_files', [])]}")
     return EXIT_OK
 
 
@@ -197,30 +171,6 @@ def _split_versioned(arg: str) -> tuple[str, str | None]:
         a, b = arg.split("@", 1)
         return a, b
     return arg, None
-
-
-def _split_versioned_dict(arg: str, version_key: str = "version") -> dict[str, str]:
-    name, version = _split_versioned(arg)
-    if not version:
-        raise SystemExit(f"rolez: '{arg}' must include @version")
-    return {"name": name, version_key: version}
-
-
-def _split_binding(arg: str) -> dict[str, str]:
-    if "=" not in arg:
-        raise SystemExit(f"rolez: --binding must be 'catalog_slug=connection_id', got {arg!r}")
-    catalog, conn = arg.split("=", 1)
-    return {"catalog_slug": catalog, "connection_id": conn}
-
-
-def _kv_pairs(items: list[str] | None) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for kv in items or []:
-        if "=" not in kv:
-            raise SystemExit(f"rolez: --var must be 'KEY=value', got {kv!r}")
-        k, v = kv.split("=", 1)
-        out[k] = v
-    return out
 
 
 # ---------- entrypoint ---------------------------------------------------
@@ -247,19 +197,6 @@ def build_parser() -> argparse.ArgumentParser:
     pi = sub.add_parser("inspect")
     pi.add_argument("target", help="slug[@version]")
     pi.set_defaults(func=cmd_inspect)
-
-    pp = sub.add_parser("provision")
-    pp.add_argument("slug")
-    pp.add_argument("--org", required=True, help="organization_id (uuid)")
-    pp.add_argument("--product", required=True, help="product_id (uuid)")
-    pp.add_argument("--name", required=True, help="agent name")
-    pp.add_argument("--version", default="latest", help="role template version (default: latest)")
-    pp.add_argument("--var", action="append", help="KEY=value (repeatable)")
-    pp.add_argument("--skill", action="append", help="extra skill ref name@version (repeatable)")
-    pp.add_argument("--subagent", action="append", help="extra subagent ref name@version (repeatable)")
-    pp.add_argument("--binding", action="append", help="integration binding catalog=connection_id (repeatable)")
-    pp.add_argument("--json", action="store_true")
-    pp.set_defaults(func=cmd_provision)
 
     return p
 

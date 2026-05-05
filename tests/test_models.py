@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from app.db import Base, get_engine, get_session_factory
-from app.models import AgentEvent, ProvisionEvent, RoleTemplate, RoleTemplateVersion
+from app.models import AgentEvent, RoleTemplate, RoleTemplateVersion
 
 
 @pytest.fixture
@@ -68,30 +68,6 @@ async def test_role_template_version_unique_per_slug(session):
     with pytest.raises(Exception):
         await session.commit()
     await session.rollback()
-
-
-async def test_provision_event_records_outcome(session):
-    pe = ProvisionEvent(
-        role_slug="support-agent",
-        role_version="0.1.0",
-        organization_id="org-uuid",
-        product_id="prod-uuid",
-        agent_name="support-eu",
-        agent_id_returned="agent-uuid",
-        caller_token_fingerprint="abc123def456",
-        variables={"SUPPORT_CHANNEL": "#eu-support"},
-        integration_bindings=[{"catalog_slug": "zendesk", "connection_id": "conn-uuid"}],
-        extra_skills=[],
-        extra_subagents=[],
-        status=200,
-        error=None,
-    )
-    session.add(pe)
-    await session.commit()
-    fetched = (await session.execute(select(ProvisionEvent))).scalar_one()
-    assert fetched.agent_id_returned == "agent-uuid"
-    assert fetched.variables["SUPPORT_CHANNEL"] == "#eu-support"
-    assert fetched.status == 200
 
 
 async def test_agent_event_logs_action(session):

@@ -40,59 +40,22 @@ export interface Identity {
   readonly description?: string | null;
 }
 
-export interface Tools {
-  readonly allow: readonly string[];
-  readonly disallow: readonly string[];
-}
-
-export interface Prompt {
-  readonly name: string;
-  readonly body: string;
-  readonly trigger_source?: string | null;
-  readonly trigger_config?: Readonly<Record<string, unknown>>;
-}
-
-export interface IOEdge {
-  readonly channel: string;
-  readonly capability?: string | null;
-}
-
-export interface ConsumedIntegration {
-  readonly catalog_slug: string;
-  readonly env_needed: readonly string[];
-}
-
-export interface RequiredVariable {
-  readonly name: string;
-  readonly description?: string | null;
-  readonly default?: string | null;
-}
-
-export interface CommunicationRules {
-  readonly can_dm: readonly string[];
-  readonly receives_dm: readonly string[];
-  readonly listens_to: readonly string[];
-  readonly posts_to: readonly string[];
-}
-
 export interface ContextFile {
-  readonly path: string;
+  readonly name: string;
   readonly content: string;
 }
 
+/**
+ * Rolez owns the recruiting brief: image, identity, skills, subagents,
+ * and the role-specific context appended to tech.saac's default.
+ * Everything else (tools, prompts, inputs/outputs, integrations, variables,
+ * communication rules) is tech.saac's concern, controlled via its admin UI.
+ */
 export interface RoleManifest {
   readonly image: ImageRef;
   readonly identity: Identity;
   readonly skills: readonly NamedRef[];
   readonly subagents: readonly NamedRef[];
-  readonly tools: Tools;
-  readonly mcp_servers: readonly string[];
-  readonly prompts: readonly Prompt[];
-  readonly inputs: readonly IOEdge[];
-  readonly outputs: readonly IOEdge[];
-  readonly consumed_integrations: readonly ConsumedIntegration[];
-  readonly required_variables: readonly RequiredVariable[];
-  readonly communication_rules: CommunicationRules;
   readonly context_files: readonly ContextFile[];
 }
 
@@ -108,11 +71,3 @@ export interface RoleDetailOut extends RoleSummary {
   readonly versions: readonly RoleVersionSummary[];
 }
 
-export interface ProvisionResult {
-  readonly agent_id: string | null;
-  readonly role_slug: string;
-  readonly role_version: string;
-  readonly status: number;
-  readonly tech_saac_response?: unknown;
-  readonly error?: string | null;
-}

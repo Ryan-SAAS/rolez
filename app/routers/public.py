@@ -12,8 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.auth import extract_apikey, token_fingerprint
 from app.db import get_session
 from app.models import RoleTemplate, RoleTemplateVersion
-from app.provisioner import ProvisionError, provision
-from app.schemas import ProvisionIn, RoleListOut, RoleOut, RoleVersionOut
+from app.schemas import RoleListOut, RoleOut, RoleVersionOut
 from app.upstream_auth import UpstreamUnreachable, verify_token
 
 router = APIRouter(prefix="/api/v1", tags=["public"])
@@ -86,6 +85,8 @@ async def list_roles(
     tag: str | None = Query(default=None),
     kind: str | None = Query(default=None),
     q: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
 ) -> RoleListOut:
     stmt = _select_role_with_versions().where(RoleTemplate.deleted_at.is_(None))
     if kind:
@@ -96,8 +97,10 @@ async def list_roles(
     rows = (await session.execute(stmt.order_by(RoleTemplate.slug))).scalars().all()
     if tag:
         rows = [r for r in rows if tag in (r.tags or [])]
-    items = [_to_role_out(r) for r in rows]
-    return RoleListOut(total=len(items), items=items)
+    # `total` is the unpaginated count (post-filter) so callers can size pagers.
+    total = len(rows)
+    items = [_to_role_out(r) for r in rows[offset : offset + limit]]
+    return RoleListOut(total=total, items=items)
 
 
 @router.get("/roles/search", response_model=RoleListOut)
@@ -140,19 +143,6 @@ async def show_role(
         "manifest_sha256": latest.manifest_sha256 if latest else None,
         "versions": [RoleVersionOut.model_validate(v).model_dump() for v in role.versions],
     }
-
-
-@router.post("/roles/{slug}/provision")
-async def provision_role(
-    slug: str,
-    body: ProvisionIn,
-    token: Annotated[str, Depends(require_caller_token)],
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    try:
-        return await provision(session, slug=slug, payload=body.model_dump(), caller_token=token)
-    except ProvisionError as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
 @router.get("/roles/{slug}/versions/{version}")

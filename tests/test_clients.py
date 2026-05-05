@@ -6,7 +6,6 @@ import respx
 
 from app.clients.agentz import AgentzClient, AgentzNotFound
 from app.clients.skillz import SkillzClient, SkillzNotFound
-from app.clients.techsaac import TechsaacClient, TechsaacError
 
 
 @respx.mock
@@ -65,43 +64,3 @@ async def test_agentz_404_raises_not_found():
         await c.get_agent("nope")
 
 
-@respx.mock
-async def test_techsaac_call_tool_forwards_apikey_and_returns_result():
-    route = respx.post("https://techsaac.example/api/mcp").mock(
-        return_value=httpx.Response(200, json={
-            "jsonrpc": "2.0", "id": 1,
-            "result": {"agent_id": "agent-uuid", "status": "starting"},
-        })
-    )
-    c = TechsaacClient(base_url="https://techsaac.example/api/mcp")
-    out = await c.call_tool("create_agent", {"name": "support-eu"}, caller_token="caller-token")
-    assert out["agent_id"] == "agent-uuid"
-    assert route.calls[0].request.headers["authorization"] == "ApiKey caller-token"
-    body = route.calls[0].request.read()
-    assert b"create_agent" in body
-    assert b"support-eu" in body
-
-
-@respx.mock
-async def test_techsaac_call_tool_raises_on_jsonrpc_error():
-    respx.post("https://techsaac.example/api/mcp").mock(
-        return_value=httpx.Response(200, json={
-            "jsonrpc": "2.0", "id": 1,
-            "error": {"code": -32603, "message": "boom"},
-        })
-    )
-    c = TechsaacClient(base_url="https://techsaac.example/api/mcp")
-    with pytest.raises(TechsaacError) as ei:
-        await c.call_tool("create_agent", {}, caller_token="caller-token")
-    assert "boom" in str(ei.value)
-
-
-@respx.mock
-async def test_techsaac_propagates_http_error_status():
-    respx.post("https://techsaac.example/api/mcp").mock(
-        return_value=httpx.Response(401, json={"error": "UNAUTHORIZED"})
-    )
-    c = TechsaacClient(base_url="https://techsaac.example/api/mcp")
-    with pytest.raises(TechsaacError) as ei:
-        await c.call_tool("create_agent", {}, caller_token="bad")
-    assert ei.value.status_code == 401

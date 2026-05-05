@@ -6,7 +6,7 @@ import {
   die,
 } from "./errors.js";
 import type { Config } from "./config.js";
-import type { ProvisionResult, RoleDetailOut, RoleListOut } from "./types.js";
+import type { RoleDetailOut, RoleListOut } from "./types.js";
 
 const USER_AGENT = "@startanaicompany/rolez-cli";
 
@@ -111,26 +111,3 @@ export async function showRole(
   return (await resp.json()) as RoleDetailOut;
 }
 
-export interface ProvisionPayload {
-  organization_id: string;
-  product_id: string;
-  name: string;
-  version?: string;
-  variables?: Record<string, string>;
-  integration_bindings?: { catalog_slug: string; connection_id: string }[];
-  extra_skills?: { name: string; version: string }[];
-  extra_subagents?: { name: string; version: string }[];
-}
-
-export async function provisionRole(
-  cfg: Config,
-  slug: string,
-  payload: ProvisionPayload,
-): Promise<ProvisionResult> {
-  const resp = await request(cfg, `/api/v1/roles/${encodeURIComponent(slug)}/provision`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return (await resp.json()) as ProvisionResult;
-}

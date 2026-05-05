@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { listRoles, provisionRole, showRole } from "../src/api.ts";
+import { listRoles, showRole } from "../src/api.ts";
 
 const cfg = { apiUrl: "https://rolez.example", apiKey: "test-token" };
 
@@ -63,27 +63,3 @@ test("showRole appends /versions/<v> when version supplied", async () => {
   }
 });
 
-test("provisionRole POSTs JSON with the right body", async () => {
-  let body: unknown = null;
-  let method = "";
-  const restore = mockFetch(async (_url, init) => {
-    method = init?.method ?? "GET";
-    body = JSON.parse((init?.body as string) ?? "{}");
-    return new Response(JSON.stringify({ agent_id: "agent-uuid", role_slug: "support-agent", role_version: "0.1.0", status: 200 }), { status: 200 });
-  });
-  try {
-    const out = await provisionRole(cfg, "support-agent", {
-      organization_id: "org",
-      product_id: "prod",
-      name: "support-eu",
-      variables: { K: "V" },
-      extra_skills: [{ name: "csv-tools", version: "0.4.1" }],
-    });
-    assert.equal(out.agent_id, "agent-uuid");
-    assert.equal(method, "POST");
-    assert.deepEqual((body as Record<string, unknown>).variables, { K: "V" });
-    assert.deepEqual((body as Record<string, unknown>).extra_skills, [{ name: "csv-tools", version: "0.4.1" }]);
-  } finally {
-    restore();
-  }
-});

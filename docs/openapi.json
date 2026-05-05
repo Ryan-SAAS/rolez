@@ -14,88 +14,6 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "IntegrationBinding": {
-        "additionalProperties": false,
-        "properties": {
-          "catalog_slug": {
-            "title": "Catalog Slug",
-            "type": "string"
-          },
-          "connection_id": {
-            "title": "Connection Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "catalog_slug",
-          "connection_id"
-        ],
-        "title": "IntegrationBinding",
-        "type": "object"
-      },
-      "ProvisionIn": {
-        "additionalProperties": false,
-        "properties": {
-          "extra_skills": {
-            "items": {
-              "$ref": "#/components/schemas/SkillRefDraft"
-            },
-            "title": "Extra Skills",
-            "type": "array"
-          },
-          "extra_subagents": {
-            "items": {
-              "$ref": "#/components/schemas/SubagentRefDraft"
-            },
-            "title": "Extra Subagents",
-            "type": "array"
-          },
-          "integration_bindings": {
-            "items": {
-              "$ref": "#/components/schemas/IntegrationBinding"
-            },
-            "title": "Integration Bindings",
-            "type": "array"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "organization_id": {
-            "title": "Organization Id",
-            "type": "string"
-          },
-          "product_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Product Id"
-          },
-          "variables": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Variables",
-            "type": "object"
-          },
-          "version": {
-            "default": "latest",
-            "title": "Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "organization_id",
-          "name"
-        ],
-        "title": "ProvisionIn",
-        "type": "object"
-      },
       "RoleCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -263,6 +181,29 @@
             ],
             "title": "Latest Version"
           },
+          "manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Sha256"
+          },
           "slug": {
             "title": "Slug",
             "type": "string"
@@ -409,6 +350,64 @@
         "title": "RoleOut",
         "type": "object"
       },
+      "RoleValidateIn": {
+        "additionalProperties": false,
+        "description": "Dry-run validation request \u2014 same shape as RoleCreateIn but the\nserver returns the resolved manifest preview without persisting.",
+        "properties": {
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "title": "RoleValidateIn",
+        "type": "object"
+      },
+      "RoleValidatedOut": {
+        "description": "Dry-run validation response \u2014 same fields as RoleCreatedOut except\nno created_at (nothing was persisted).",
+        "properties": {
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          }
+        },
+        "required": [
+          "manifest_sha256",
+          "manifest"
+        ],
+        "title": "RoleValidatedOut",
+        "type": "object"
+      },
       "RoleVersionOut": {
         "properties": {
           "created_at": {
@@ -431,44 +430,6 @@
           "created_at"
         ],
         "title": "RoleVersionOut",
-        "type": "object"
-      },
-      "SkillRefDraft": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "version": {
-            "default": "latest",
-            "title": "Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "SkillRefDraft",
-        "type": "object"
-      },
-      "SubagentRefDraft": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "version": {
-            "default": "latest",
-            "title": "Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "SubagentRefDraft",
         "type": "object"
       },
       "ValidationError": {
@@ -522,6 +483,7 @@
   "paths": {
     "/api/admin/roles": {
       "get": {
+        "description": "Mirrors the public list filters (q/tag/kind) so AdminOffice gets the\nsame query surface here. include_deleted is admin-only \u2014 the public\nsurface always hides soft-deleted rows.",
         "operationId": "list_roles_api_admin_roles_get",
         "parameters": [
           {
@@ -532,6 +494,77 @@
               "default": false,
               "title": "Include Deleted",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
             }
           },
           {
@@ -636,6 +669,66 @@
         ]
       }
     },
+    "/api/admin/roles/validate": {
+      "post": {
+        "description": "Dry-run a role manifest \u2014 same validation + resolver path as\n``POST /api/admin/roles`` but never persists. Returns the resolved\n(skill/subagent versions pinned) manifest preview + its sha256, or\n422 with the validation/resolver error.\n\nUseful for AI-assisted editors that want to preview a manifest before\nasking the user to commit it.",
+        "operationId": "validate_role_api_admin_roles_validate_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleValidateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleValidatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Role",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/roles/{slug}": {
       "delete": {
         "operationId": "delete_role_api_admin_roles__slug__delete",
@@ -687,6 +780,7 @@
         ]
       },
       "get": {
+        "description": "Returns the role's metadata + the **latest version's manifest** + sha256\nso the AdminOffice and tech.saac's daemon-config builder can render /\nconsume the role in a single round-trip.",
         "operationId": "show_role_api_admin_roles__slug__get",
         "parameters": [
           {
@@ -801,6 +895,74 @@
         "tags": [
           "admin"
         ]
+      },
+      "get": {
+        "description": "Mirror of the public /api/v1/.../versions/{v} endpoint, gated behind\nadmin auth so tech.saac (which only has the admin key, not a us_* MCP\ntoken) can fetch a specific version's manifest.",
+        "operationId": "show_role_version_api_admin_roles__slug__versions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Show Role Version Api Admin Roles  Slug  Versions  Version  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Show Role Version",
+        "tags": [
+          "admin"
+        ]
       }
     },
     "/api/v1/roles": {
@@ -853,6 +1015,29 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
             }
           },
           {
@@ -1014,76 +1199,6 @@
           }
         },
         "summary": "Show Role",
-        "tags": [
-          "public"
-        ]
-      }
-    },
-    "/api/v1/roles/{slug}/provision": {
-      "post": {
-        "operationId": "provision_role_api_v1_roles__slug__provision_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "slug",
-            "required": true,
-            "schema": {
-              "title": "Slug",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProvisionIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Provision Role Api V1 Roles  Slug  Provision Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Provision Role",
         "tags": [
           "public"
         ]

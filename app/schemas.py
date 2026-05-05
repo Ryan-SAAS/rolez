@@ -5,18 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.validation import (
-    SkillRefDraft,
-    SubagentRefDraft,
-    validate_slug,
-    validate_version,
-)
-
-
-class IntegrationBinding(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    catalog_slug: str
-    connection_id: str
+from app.validation import validate_slug, validate_version
 
 
 class RoleCreateIn(BaseModel):
@@ -48,6 +37,24 @@ class RoleCreateIn(BaseModel):
         return v
 
 
+class RoleValidateIn(BaseModel):
+    """Dry-run validation request — same shape as RoleCreateIn but the
+    server returns the resolved manifest preview without persisting."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    slug: str | None = None
+    manifest: dict[str, Any]
+
+    @field_validator("slug")
+    @classmethod
+    def _vslug(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        validate_slug(v)
+        return v
+
+
 class RoleVersionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     version: str
@@ -75,6 +82,12 @@ class RoleListOut(BaseModel):
 
 
 class RoleDetailOut(RoleOut):
+    # `manifest` / `manifest_sha256` are populated from the latest version row
+    # so admin consumers (tech.saac AdminOffice + daemon-config builder) can
+    # render the full role definition in one round-trip — no need to fetch
+    # /versions/{v} after the show.
+    manifest: dict[str, Any] | None = None
+    manifest_sha256: str | None = None
     versions: list[RoleVersionOut] = Field(default_factory=list)
 
 
@@ -86,54 +99,13 @@ class RoleCreatedOut(BaseModel):
     created_at: datetime
 
 
-class ProvisionIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class RoleValidatedOut(BaseModel):
+    """Dry-run validation response — same fields as RoleCreatedOut except
+    no created_at (nothing was persisted)."""
 
-    organization_id: str
-    product_id: str | None = None
-    name: str
-    variables: dict[str, str] = Field(default_factory=dict)
-    integration_bindings: list[IntegrationBinding] = Field(default_factory=list)
-    extra_skills: list[SkillRefDraft] = Field(default_factory=list)
-    extra_subagents: list[SubagentRefDraft] = Field(default_factory=list)
-    version: str = "latest"
-
-    @field_validator("name")
-    @classmethod
-    def _vname(cls, v: str) -> str:
-        validate_slug(v)
-        return v
-
-    @field_validator("version")
-    @classmethod
-    def _vver(cls, v: str) -> str:
-        if v == "latest":
-            return v
-        validate_version(v)
-        return v
-
-
-class ProvisionOut(BaseModel):
-    agent_id: str | None = None
-    role_slug: str
-    role_version: str
-    status: int
-    tech_saac_response: Any = None
-    error: str | None = None
-
-
-class ProvisionEventOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    ts: datetime
-    role_slug: str
-    role_version: str
-    organization_id: str | None = None
-    product_id: str | None = None
-    agent_name: str | None = None
-    agent_id_returned: str | None = None
-    status: int
-    error: str | None = None
+    slug: str | None = None
+    manifest_sha256: str
+    manifest: dict[str, Any]
 
 
 class HealthOut(BaseModel):

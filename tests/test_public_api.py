@@ -17,16 +17,6 @@ def _draft_body(slug: str = "support-agent", **overrides) -> dict:
             "identity": {"name": slug},
             "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
             "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
-            "tools": {"allow": [], "disallow": []},
-            "mcp_servers": [],
-            "prompts": [],
-            "inputs": [],
-            "outputs": [],
-            "consumed_integrations": [],
-            "required_variables": [],
-            "communication_rules": {
-                "can_dm": [], "receives_dm": [], "listens_to": [], "posts_to": [],
-            },
             "context_files": [],
         },
     }
@@ -124,6 +114,35 @@ async def test_public_show_404_for_unknown(client, agent_headers):
     _mock_techsaac_valid()
     resp = await client.get("/api/v1/roles/unknown", headers=agent_headers)
     assert resp.status_code == 404
+
+
+@respx.mock
+async def test_public_list_pagination_offset_and_limit(client, admin_headers, agent_headers):
+    """Pagination on /api/v1/roles — total counts everything (post-filter),
+    items[] is the requested page."""
+    _mock_techsaac_valid()
+    for slug in ("alpha-agent", "beta-agent", "gamma-agent"):
+        await client.post("/api/admin/roles", headers=admin_headers, json=_draft_body(slug))
+
+    resp = await client.get("/api/v1/roles?limit=2", headers=agent_headers)
+    body = resp.json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 2
+    assert body["items"][0]["slug"] == "alpha-agent"
+    assert body["items"][1]["slug"] == "beta-agent"
+
+    resp2 = await client.get("/api/v1/roles?limit=2&offset=2", headers=agent_headers)
+    body2 = resp2.json()
+    assert body2["total"] == 3
+    assert len(body2["items"]) == 1
+    assert body2["items"][0]["slug"] == "gamma-agent"
+
+
+@respx.mock
+async def test_public_list_rejects_oversized_limit(client, agent_headers):
+    _mock_techsaac_valid()
+    resp = await client.get("/api/v1/roles?limit=999", headers=agent_headers)
+    assert resp.status_code == 422  # FastAPI Query(le=200) enforces
 
 
 @respx.mock

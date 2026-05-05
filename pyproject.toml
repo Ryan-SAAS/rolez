@@ -60,7 +60,6 @@ also_copy = [
     "app/main.py",
     "app/models.py",
     "app/schemas.py",
-    "app/provisioner.py",
     "app/routers/",
     "cli/",
 ]

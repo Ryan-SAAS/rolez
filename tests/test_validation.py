@@ -70,20 +70,7 @@ def _full_manifest() -> dict:
         "identity": {"name": "Support Lead", "icon": "🎧", "tone": "calm", "description": "..."},
         "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
         "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
-        "tools": {"allow": ["Read", "Edit"], "disallow": []},
-        "mcp_servers": ["tech-saac"],
-        "prompts": [],
-        "inputs": [],
-        "outputs": [],
-        "consumed_integrations": [{"catalog_slug": "zendesk", "env_needed": ["ZENDESK_API_KEY"]}],
-        "required_variables": [{"name": "SUPPORT_CHANNEL", "description": "...", "default": None}],
-        "communication_rules": {
-            "can_dm": ["product-owner"],
-            "receives_dm": ["*"],
-            "listens_to": ["#support"],
-            "posts_to": ["#support"],
-        },
-        "context_files": [{"path": "CLAUDE.md", "content": "# Support role\n"}],
+        "context_files": [{"name": "CLAUDE.md", "content": "# Support role\n"}],
     }
 
 
@@ -91,26 +78,41 @@ def test_role_manifest_round_trips():
     m = RoleManifest(**_full_manifest())
     assert m.image.ref == "saac/support-agent"
     assert m.skills[0].name == "pdf-generator"
-    assert m.context_files[0].path == "CLAUDE.md"
+    assert m.context_files[0].name == "CLAUDE.md"
+
+
+def test_role_manifest_ignores_legacy_fields():
+    """Old persisted manifests may carry tools/mcp_servers/etc. We just
+    ignore them so existing rows keep deserialising cleanly."""
+    body = {
+        **_full_manifest(),
+        "tools": {"allow": ["Read"], "disallow": []},
+        "mcp_servers": ["tech-saac"],
+        "prompts": [],
+        "communication_rules": {"can_dm": ["x"]},
+    }
+    m = RoleManifest(**body)
+    assert m.image.ref == "saac/support-agent"
+    assert not hasattr(m, "tools")
 
 
 def test_context_files_reject_path_traversal():
     bad = _full_manifest()
-    bad["context_files"] = [{"path": "../escape.md", "content": "x"}]
+    bad["context_files"] = [{"name": "../escape.md", "content": "x"}]
     with pytest.raises(ValidationError):
         RoleManifest(**bad)
 
 
 def test_context_files_reject_absolute_paths():
     bad = _full_manifest()
-    bad["context_files"] = [{"path": "/etc/passwd", "content": "x"}]
+    bad["context_files"] = [{"name": "/etc/passwd", "content": "x"}]
     with pytest.raises(ValidationError):
         RoleManifest(**bad)
 
 
-def test_context_files_require_non_empty_path():
+def test_context_files_require_non_empty_name():
     bad = _full_manifest()
-    bad["context_files"] = [{"path": "", "content": "x"}]
+    bad["context_files"] = [{"name": "", "content": "x"}]
     with pytest.raises(ValidationError):
         RoleManifest(**bad)
 

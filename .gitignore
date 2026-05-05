@@ -21,3 +21,4 @@ mutants/
 
 # Saac per-workstation state
 .saac/
+.claude/

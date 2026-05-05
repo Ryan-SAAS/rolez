@@ -81,46 +81,6 @@ def test_cli_show(cli, capsys):
     assert "image" in out
 
 
-def test_cli_provision(cli, capsys):
-    """provision sends POST with the right body and reports the new agent_id."""
-    captured = {}
-
-    def fake_open(req, timeout=None):
-        captured["url"] = req.full_url
-        captured["method"] = req.get_method()
-        captured["body"] = json.loads(req.data.decode())
-        captured["auth"] = req.headers.get("Authorization")
-        return _mock_resp(200, {"agent_id": "agent-uuid", "role_slug": "support-agent",
-                                "role_version": "0.1.0", "status": 200})
-
-    with patch("urllib.request.urlopen", side_effect=fake_open):
-        rc = cli.main([
-            "provision", "support-agent",
-            "--org", "org-uuid", "--product", "prod-uuid",
-            "--name", "support-eu",
-            "--var", "SUPPORT_CHANNEL=#eu",
-            "--skill", "csv-tools@0.4.1",
-            "--subagent", "log-grepper@0.1.0",
-            "--binding", "zendesk=conn-uuid",
-        ])
-    assert rc == 0, capsys.readouterr().out
-    out = capsys.readouterr().out
-    assert "agent-uuid" in out
-
-    # Wire-format checks
-    assert captured["method"] == "POST"
-    assert captured["url"].endswith("/api/v1/roles/support-agent/provision")
-    assert captured["auth"] == "ApiKey test-token"
-    body = captured["body"]
-    assert body["organization_id"] == "org-uuid"
-    assert body["product_id"] == "prod-uuid"
-    assert body["name"] == "support-eu"
-    assert body["variables"] == {"SUPPORT_CHANNEL": "#eu"}
-    assert body["extra_skills"] == [{"name": "csv-tools", "version": "0.4.1"}]
-    assert body["extra_subagents"] == [{"name": "log-grepper", "version": "0.1.0"}]
-    assert body["integration_bindings"] == [{"catalog_slug": "zendesk", "connection_id": "conn-uuid"}]
-
-
 def test_cli_unauthorized_exits_with_auth_code(cli, capsys):
     import urllib.error
     err = urllib.error.HTTPError("u", 401, "u", {}, io.BytesIO(b'{"detail":"invalid api key"}'))
@@ -155,7 +115,7 @@ def test_cli_search(cli, capsys):
 
 
 def test_cli_inspect_renders_summary(cli, capsys):
-    """`inspect` must print image, skills, subagents, required_variables names."""
+    """`inspect` must print image, skills, subagents, context_files names."""
     body = {
         "slug": "support-agent",
         "latest_version": "0.1.0",
@@ -163,7 +123,7 @@ def test_cli_inspect_renders_summary(cli, capsys):
             "image": {"ref": "saac/support-agent", "version": "1.4.0"},
             "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
             "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
-            "required_variables": [{"name": "SUPPORT_CHANNEL", "description": "..."}],
+            "context_files": [{"name": "CLAUDE.md", "content": "..."}],
         },
     }
     with patch("urllib.request.urlopen", return_value=_mock_resp(200, body)):
@@ -173,7 +133,7 @@ def test_cli_inspect_renders_summary(cli, capsys):
     assert "saac/support-agent@1.4.0" in out
     assert "pdf-generator@1.2.3" in out
     assert "code-reviewer@0.5.0" in out
-    assert "SUPPORT_CHANNEL" in out
+    assert "CLAUDE.md" in out
 
 
 def test_cli_inspect_falls_back_to_raw_when_manifest_missing(cli, capsys):
@@ -183,34 +143,6 @@ def test_cli_inspect_falls_back_to_raw_when_manifest_missing(cli, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "x" in out
-
-
-def test_cli_provision_rejects_skill_without_version(cli):
-    """Malformed --skill arg without @version should exit usage, not crash."""
-    rc = cli.main([
-        "provision", "support-agent",
-        "--org", "o", "--product", "p", "--name", "n",
-        "--skill", "no-version-here",
-    ])
-    assert rc != 0
-
-
-def test_cli_provision_rejects_var_without_equals(cli):
-    rc = cli.main([
-        "provision", "support-agent",
-        "--org", "o", "--product", "p", "--name", "n",
-        "--var", "MISSING_EQUALS",
-    ])
-    assert rc != 0
-
-
-def test_cli_provision_rejects_binding_without_equals(cli):
-    rc = cli.main([
-        "provision", "support-agent",
-        "--org", "o", "--product", "p", "--name", "n",
-        "--binding", "no-equals",
-    ])
-    assert rc != 0
 
 
 def test_cli_no_audit_command(cli):
