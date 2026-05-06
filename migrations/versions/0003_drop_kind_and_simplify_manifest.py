@@ -11,9 +11,16 @@ change is a one-time data migration on ``role_template_versions.manifest``:
 
 This is a breaking API change; rolez bumps to 0.2.0 to signal it.
 
-Revision ID: 0003
+Revision ID: 0003_simplify_manifest
 Revises: 0002_drop_provision_events
 Create Date: 2026-05-06
+
+Note on revision-ID length: ``alembic_version.version_num`` is the
+Alembic default VARCHAR(32). The previous ID for this migration
+(``0003_drop_kind_and_simplify_manifest``, 36 chars) overflowed that
+column and rolled back the whole transaction on Railway's Postgres,
+even though the DDL + data step both ran fine. Keep new revision IDs
+≤ 32 chars (the actual filename can still be longer).
 """
 from __future__ import annotations
 
@@ -23,7 +30,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0003_drop_kind_and_simplify_manifest"
+revision = "0003_simplify_manifest"
 down_revision = "0002_drop_provision_events"
 branch_labels = None
 depends_on = None
