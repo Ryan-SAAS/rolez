@@ -115,7 +115,7 @@ def test_cli_search(cli, capsys):
 
 
 def test_cli_inspect_renders_summary(cli, capsys):
-    """`inspect` must print image, skills, subagents, and a context preview."""
+    """`inspect` must print image, skills, subagents, plugins, and a context preview."""
     body = {
         "slug": "support-agent",
         "latest_version": "0.1.0",
@@ -123,6 +123,7 @@ def test_cli_inspect_renders_summary(cli, capsys):
             "image": {"ref": "saac/support-agent", "version": "1.4.0"},
             "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
             "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
+            "plugins": [{"name": "code-helpers", "version": "1.4.0"}],
             "context": "# Support role\nbe customer-minded\n",
         },
     }
@@ -133,6 +134,7 @@ def test_cli_inspect_renders_summary(cli, capsys):
     assert "saac/support-agent@1.4.0" in out
     assert "pdf-generator@1.2.3" in out
     assert "code-reviewer@0.5.0" in out
+    assert "code-helpers@1.4.0" in out
     assert "Support role" in out  # context preview shows first line
 
 

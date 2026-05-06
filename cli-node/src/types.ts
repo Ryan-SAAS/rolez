@@ -33,8 +33,8 @@ export interface ImageRef {
 }
 
 /**
- * Rolez owns the recruiting brief: image, skills, subagents, and one
- * `context` text appended to tech.saac's default CLAUDE.md at
+ * Rolez owns the recruiting brief: image, skills, subagents, plugins, and
+ * one `context` text appended to tech.saac's default CLAUDE.md at
  * daemon-config-build time. Everything else (identity, kind, tools,
  * prompts, env vars, integrations, comm rules) is tech.saac's concern.
  */
@@ -42,6 +42,7 @@ export interface RoleManifest {
   readonly image: ImageRef;
   readonly skills: readonly NamedRef[];
   readonly subagents: readonly NamedRef[];
+  readonly plugins: readonly NamedRef[];
   readonly context: string;
 }
 

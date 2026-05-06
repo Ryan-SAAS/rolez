@@ -126,6 +126,8 @@ async function cmdInspect(args: string[]): Promise<number> {
   for (const s of manifest.skills ?? []) console.log(`  - ${s.name}@${s.version}`);
   console.log("subagents:");
   for (const s of manifest.subagents ?? []) console.log(`  - ${s.name}@${s.version}`);
+  console.log("plugins:");
+  for (const p of manifest.plugins ?? []) console.log(`  - ${p.name}@${p.version}`);
   const ctx = manifest.context ?? "";
   if (ctx) {
     const firstLine = (ctx.split("\n", 1)[0] ?? "").slice(0, 80);

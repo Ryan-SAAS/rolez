@@ -158,6 +158,9 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     print("subagents:")
     for a in manifest.get("subagents", []):
         print(f"  - {a['name']}@{a['version']}")
+    print("plugins:")
+    for p in manifest.get("plugins", []):
+        print(f"  - {p['name']}@{p['version']}")
     ctx = manifest.get("context", "")
     if ctx:
         first_line = ctx.split("\n", 1)[0][:80]
