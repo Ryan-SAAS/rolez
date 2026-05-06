@@ -1,6 +1,9 @@
 {
   "name": "@startanaicompany/rolez",
-  "version": "0.1.0",
+  "version": "0.2.1",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Agent-side CLI for the rolez role registry + provisioner at startanaicompany.com",
   "keywords": [
     "rolez",

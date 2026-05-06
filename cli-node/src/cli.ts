@@ -6,7 +6,7 @@ import { loadConfig } from "./config.js";
 import { EXIT_OK, EXIT_USAGE, die } from "./errors.js";
 import type { RoleManifest, RoleSummary } from "./types.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.1";
 
 const USAGE = `rolez — agent-side CLI for the rolez role catalogue
 
