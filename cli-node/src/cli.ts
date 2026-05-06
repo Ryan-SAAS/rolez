@@ -6,7 +6,7 @@ import { loadConfig } from "./config.js";
 import { EXIT_OK, EXIT_USAGE, die } from "./errors.js";
 import type { RoleManifest, RoleSummary } from "./types.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.2";
 
 const USAGE = `rolez — agent-side CLI for the rolez role catalogue
 
@@ -19,8 +19,7 @@ commands:
   inspect <slug>[@version]          show + summarise referenced parts
 env:
   ROLEZ_API_URL                 optional  defaults to https://rolez.startanaicompany.com
-  ROLEZ_API_KEY                 required  the assistant's tech.saac MCP api key
-                                          (also accepts MCP_ORCHESTRATOR_API_KEY)
+  SAAC_AGENT_API_KEY            required  per-agent ag_*-token (set by tech.saac in every container)
 
 exit codes: 0 ok  1 usage  2 auth  3 not found  4 network  5 client error
 `;

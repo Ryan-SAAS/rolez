@@ -10,12 +10,14 @@ export interface Config {
 export function loadConfig(): Config {
   const apiUrl = (process.env.ROLEZ_API_URL ?? DEFAULT_API_URL).replace(/\/+$/, "");
 
-  // Accept ROLEZ_API_KEY as the canonical name; fall back to
-  // MCP_ORCHESTRATOR_API_KEY (the env name @startanaicompany/techsaac-cli uses)
-  // so assistants don't have to plumb a second key.
-  const apiKey = process.env.ROLEZ_API_KEY ?? process.env.MCP_ORCHESTRATOR_API_KEY ?? "";
+  // SAAC_AGENT_API_KEY is the per-agent us_*-token tech.saac injects into
+  // every container. It is the only credential the rolez CLI accepts — it's
+  // semantically distinct from MCP_ORCHESTRATOR_API_KEY (techsaac-cli
+  // shared key) and ROLEZ_API_KEY (rolez admin key); using either of those
+  // would be a category error.
+  const apiKey = process.env.SAAC_AGENT_API_KEY ?? "";
   if (!apiKey) {
-    die(EXIT_USAGE, "missing required env var ROLEZ_API_KEY (or MCP_ORCHESTRATOR_API_KEY)");
+    die(EXIT_USAGE, "missing required env var SAAC_AGENT_API_KEY");
   }
 
   return { apiUrl, apiKey };
