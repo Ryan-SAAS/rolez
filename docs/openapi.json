@@ -452,7 +452,7 @@
   "info": {
     "description": "Role catalogue for the startanaicompany.com agent fleet.",
     "title": "rolez",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     skillz_token: str = Field(default="", alias="SKILLZ_TOKEN")
     agentz_api_url: str = Field(default="https://agentz.startanaicompany.com", alias="AGENTZ_API_URL")
     agentz_token: str = Field(default="", alias="AGENTZ_TOKEN")
+    pluginz_api_url: str = Field(default="https://pluginz.startanaicompany.com", alias="PLUGINZ_API_URL")
+    pluginz_token: str = Field(default="", alias="PLUGINZ_TOKEN")
 
     mcp_orchestrator_url: str = Field(
         default="https://tech.startanaicompany.com/api/mcp",

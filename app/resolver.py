@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from app.clients.agentz import AgentzClient, AgentzError, AgentzNotFound, AgentzUnreachable
+from app.clients.pluginz import (
+    PluginzClient,
+    PluginzError,
+    PluginzNotFound,
+    PluginzUnreachable,
+)
 from app.clients.skillz import SkillzClient, SkillzError, SkillzNotFound, SkillzUnreachable
 from app.config import get_settings
 from app.validation import (
     ImageRefDraft,
+    PluginRefDraft,
     RoleManifestDraft,
     SkillRefDraft,
     SubagentRefDraft,
@@ -34,6 +41,11 @@ def _build_skillz() -> SkillzClient:
 def _build_agentz() -> AgentzClient:
     s = get_settings()
     return AgentzClient(base_url=s.agentz_api_url, token=s.agentz_token)
+
+
+def _build_pluginz() -> PluginzClient:
+    s = get_settings()
+    return PluginzClient(base_url=s.pluginz_api_url, token=s.pluginz_token)
 
 
 async def _resolve_skill_version(
@@ -82,6 +94,29 @@ async def _resolve_subagent_version(
     return SubagentRefDraft(name=ref.name, version=latest)
 
 
+async def _resolve_plugin_version(
+    client: PluginzClient, ref: PluginRefDraft
+) -> PluginRefDraft:
+    if ref.version != "latest":
+        return ref
+    try:
+        data = await client.get_plugin(ref.name)
+    except PluginzNotFound as e:
+        raise ResolverError(str(e)) from e
+    except PluginzUnreachable as e:
+        raise ResolverError(
+            f"pluginz outage while resolving {ref.name!r}: {e}",
+            is_upstream_outage=True,
+        ) from e
+    except PluginzError as e:
+        raise ResolverError(f"failed to resolve plugin {ref.name!r}: {e}") from e
+    latest = data.get("latest_version")
+    if not latest:
+        raise ResolverError(f"plugin {ref.name!r} has no published versions")
+    validate_version(latest)
+    return PluginRefDraft(name=ref.name, version=latest)
+
+
 async def _resolve_image(image: ImageRefDraft) -> ImageRefDraft:
     """The image ref is forwarded verbatim — concrete digest resolution
     happens inside tech.saac's `create_agent` tool at provision time. Rolez
@@ -98,7 +133,11 @@ async def resolve_draft(draft: RoleManifestDraft) -> RoleManifestDraft:
     """
     skillz = _build_skillz()
     agentz = _build_agentz()
+    pluginz = _build_pluginz()
     skills = [await _resolve_skill_version(skillz, s) for s in draft.skills]
     subagents = [await _resolve_subagent_version(agentz, a) for a in draft.subagents]
+    plugins = [await _resolve_plugin_version(pluginz, p) for p in draft.plugins]
     image = await _resolve_image(draft.image)
-    return draft.model_copy(update={"skills": skills, "subagents": subagents, "image": image})
+    return draft.model_copy(
+        update={"skills": skills, "subagents": subagents, "plugins": plugins, "image": image}
+    )

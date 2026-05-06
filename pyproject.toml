@@ -1,6 +1,6 @@
 [project]
 name = "rolez"
-version = "0.2.0"
+version = "0.3.0"
 description = "Role registry and provisioner for the startanaicompany.com agent fleet"
 requires-python = ">=3.10"
 dependencies = [

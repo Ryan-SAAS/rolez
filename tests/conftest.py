@@ -16,6 +16,8 @@ os.environ.setdefault("SKILLZ_API_URL", "https://skillz.example")
 os.environ.setdefault("SKILLZ_TOKEN", "test-skillz-token")
 os.environ.setdefault("AGENTZ_API_URL", "https://agentz.example")
 os.environ.setdefault("AGENTZ_TOKEN", "test-agentz-token")
+os.environ.setdefault("PLUGINZ_API_URL", "https://pluginz.example")
+os.environ.setdefault("PLUGINZ_TOKEN", "test-pluginz-token")
 os.environ.setdefault("MCP_ORCHESTRATOR_URL", "https://techsaac.example/api/mcp")
 os.environ.setdefault("ROLEZ_AUTH_TTL_SECONDS", "60")
 

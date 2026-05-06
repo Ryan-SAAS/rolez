@@ -77,6 +77,12 @@ class SubagentRef(SkillRef):
     pass
 
 
+class PluginRef(SkillRef):
+    """A pinned plugin reference (name + semver). The plugin contents live in
+    pluginz; the role manifest only carries the slug + version pair, resolved
+    at admin-save time."""
+
+
 class ImageRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
     ref: str
@@ -117,6 +123,10 @@ class SubagentRefDraft(SkillRefDraft):
     pass
 
 
+class PluginRefDraft(SkillRefDraft):
+    pass
+
+
 class ImageRefDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
     ref: str
@@ -149,10 +159,11 @@ class _RoleManifestBase(BaseModel):
 
 
 class RoleManifest(_RoleManifestBase):
-    """A resolved role manifest — all skill/subagent/image refs are pinned."""
+    """A resolved role manifest — all skill/subagent/plugin/image refs are pinned."""
     image: ImageRef
     skills: list[SkillRef] = Field(default_factory=list)
     subagents: list[SubagentRef] = Field(default_factory=list)
+    plugins: list[PluginRef] = Field(default_factory=list)
 
 
 class RoleManifestDraft(_RoleManifestBase):
@@ -160,6 +171,7 @@ class RoleManifestDraft(_RoleManifestBase):
     image: ImageRefDraft
     skills: list[SkillRefDraft] = Field(default_factory=list)
     subagents: list[SubagentRefDraft] = Field(default_factory=list)
+    plugins: list[PluginRefDraft] = Field(default_factory=list)
 
 
 # ---- Determinism helpers -----------------------------------------------
