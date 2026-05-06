@@ -1,15 +1,14 @@
 import { EXIT_USAGE, die } from "./errors.js";
 
+const DEFAULT_API_URL = "https://rolez.startanaicompany.com";
+
 export interface Config {
   apiUrl: string;
   apiKey: string;
 }
 
 export function loadConfig(): Config {
-  const apiUrl = (process.env.ROLEZ_API_URL ?? "").replace(/\/+$/, "");
-  if (!apiUrl) {
-    die(EXIT_USAGE, "missing required env var ROLEZ_API_URL");
-  }
+  const apiUrl = (process.env.ROLEZ_API_URL ?? DEFAULT_API_URL).replace(/\/+$/, "");
 
   // Accept ROLEZ_API_KEY as the canonical name; fall back to
   // MCP_ORCHESTRATOR_API_KEY (the env name @startanaicompany/techsaac-cli uses)

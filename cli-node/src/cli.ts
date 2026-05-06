@@ -6,7 +6,7 @@ import { loadConfig } from "./config.js";
 import { EXIT_OK, EXIT_USAGE, die } from "./errors.js";
 import type { RoleManifest, RoleSummary } from "./types.js";
 
-const VERSION = "0.2.1";
+const VERSION = "0.3.0";
 
 const USAGE = `rolez — agent-side CLI for the rolez role catalogue
 
@@ -18,7 +18,7 @@ commands:
   show <slug>[@version]             show role manifest (resolved skills/subagents/image)
   inspect <slug>[@version]          show + summarise referenced parts
 env:
-  ROLEZ_API_URL                 required  e.g. https://rolez.startanaicompany.com
+  ROLEZ_API_URL                 optional  defaults to https://rolez.startanaicompany.com
   ROLEZ_API_KEY                 required  the assistant's tech.saac MCP api key
                                           (also accepts MCP_ORCHESTRATOR_API_KEY)
 

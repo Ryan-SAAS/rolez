@@ -18,7 +18,6 @@ RUN pip install --upgrade pip \
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
-COPY cli ./cli
 COPY start.sh ./start.sh
 RUN chmod +x /app/start.sh
 

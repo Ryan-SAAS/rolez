@@ -22,7 +22,6 @@ calls `/api/admin/*`.
 | `GET /api/v1/*` | Assistants | Caller's tech.saac MCP api key (delegated, validated upstream) |
 | `POST /api/v1/roles/{slug}/provision` | Assistants | Same — token re-used downstream as the principal |
 | `GET\|POST\|DELETE /api/admin/*` | tech.saac UI / backend | Single env-var `ROLEZ_ADMIN_API_KEY` |
-| `GET /cli/rolez` | Agent containers self-installing the CLI | Public |
 | `GET /health` | Infra | Public |
 | `GET /metrics` | Prometheus | (basic auth, future) |
 
@@ -54,29 +53,27 @@ uv pip install -e ".[dev]"
 .venv/bin/pytest -q
 ```
 
-## CLI install (inside agent containers)
+## CLI install
 
-Stdlib Python CLI, served by the API itself:
+Published on npm as [`@startanaicompany/rolez`](https://www.npmjs.com/package/@startanaicompany/rolez):
 
 ```bash
+npm i -g @startanaicompany/rolez
+# or one-shot
+npx @startanaicompany/rolez list
+```
+
+Env:
+
+```bash
+# Defaults to https://rolez.startanaicompany.com — only needed for staging/local.
 export ROLEZ_API_URL=https://rolez.startanaicompany.com
-export ROLEZ_API_KEY="$MCP_ORCHESTRATOR_API_KEY"   # or set ROLEZ_API_KEY directly
-curl -fsSL "$ROLEZ_API_URL/cli/rolez" -o /usr/local/bin/rolez
-chmod +x /usr/local/bin/rolez
+# Caller's tech.saac MCP api key. Falls back to MCP_ORCHESTRATOR_API_KEY.
+export ROLEZ_API_KEY="$MCP_ORCHESTRATOR_API_KEY"
 
 rolez list
 rolez show support-agent
-rolez provision support-agent \
-  --org "$ORG_ID" --product "$PRODUCT_ID" --name support-eu \
-  --var SUPPORT_CHANNEL=#eu-support \
-  --skill csv-tools@0.4.1 \
-  --binding zendesk=$ZENDESK_CONNECTION_ID
-```
-
-Or via npm:
-
-```bash
-npx -p @startanaicompany/rolez rolez list
+rolez inspect support-agent
 ```
 
 ## Provisioning flow
@@ -100,7 +97,7 @@ caller-token fingerprint, the resolved role version, and tech.saac's status.
 
 ```
 app/                        FastAPI service
-  main.py                   bootstrap, CORS, root + /cli/rolez
+  main.py                   bootstrap, CORS, root
   config.py                 env-driven Settings
   db.py                     async SQLAlchemy engine
   auth.py                   admin api-key check
@@ -115,8 +112,7 @@ app/                        FastAPI service
     admin.py                /api/admin/* — role CRUD
     health.py               /health
 
-cli/rolez                   stdlib Python CLI, served at /cli/rolez
-cli-node/                   TypeScript Node CLI, npm @startanaicompany/rolez
+cli-node/                   TypeScript CLI — npm @startanaicompany/rolez
 
 migrations/                 Alembic
 tests/                      pytest suite (74 tests)

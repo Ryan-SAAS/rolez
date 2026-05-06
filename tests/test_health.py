@@ -18,7 +18,9 @@ async def test_root_returns_metadata(client):
     assert "endpoints" in body
     assert body["endpoints"]["public"] == "/api/v1"
     assert body["endpoints"]["admin"] == "/api/admin"
-    assert body["endpoints"]["cli"] == "/cli/rolez"
     # `/metrics` is NOT advertised — there's no metrics router yet, and the
     # root payload must not promise an endpoint that doesn't exist.
     assert "metrics" not in body["endpoints"]
+    # The Python stdlib CLI bootstrap was dropped — we ship the Node
+    # CLI on npm (@startanaicompany/rolez) only.
+    assert "cli" not in body["endpoints"]

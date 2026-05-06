@@ -329,17 +329,6 @@ def test_extract_apikey_returns_none_for_apikey_with_empty_token():
     assert extract_apikey("ApiKey ") is None
 
 
-# --- main: CLI not packaged ---------------------------------------------
-
-async def test_cli_endpoint_returns_500_when_file_missing(client, monkeypatch):
-    from app import main as main_module
-    from pathlib import Path
-    monkeypatch.setattr(main_module, "CLI_PATH", Path("/nonexistent/rolez"))
-    resp = await client.get("/cli/rolez")
-    assert resp.status_code == 500
-    assert "not packaged" in resp.text.lower()
-
-
 # --- helpers ------------------------------------------------------------
 
 def _admin_seed_body(slug: str = "support-agent") -> dict:
