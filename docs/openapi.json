@@ -39,21 +39,6 @@
             ],
             "title": "Display Name"
           },
-          "kind": {
-            "anyOf": [
-              {
-                "enum": [
-                  "agent",
-                  "assistant"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Kind"
-          },
           "manifest": {
             "additionalProperties": true,
             "title": "Manifest",
@@ -166,10 +151,6 @@
             ],
             "title": "Display Name"
           },
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
           "latest_version": {
             "anyOf": [
               {
@@ -235,7 +216,6 @@
         },
         "required": [
           "slug",
-          "kind",
           "created_at",
           "updated_at"
         ],
@@ -304,10 +284,6 @@
             ],
             "title": "Display Name"
           },
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
           "latest_version": {
             "anyOf": [
               {
@@ -343,7 +319,6 @@
         },
         "required": [
           "slug",
-          "kind",
           "created_at",
           "updated_at"
         ],
@@ -475,15 +450,15 @@
     }
   },
   "info": {
-    "description": "Role registry + provisioner for the startanaicompany.com agent fleet.",
+    "description": "Role catalogue for the startanaicompany.com agent fleet.",
     "title": "rolez",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {
     "/api/admin/roles": {
       "get": {
-        "description": "Mirrors the public list filters (q/tag/kind) so AdminOffice gets the\nsame query surface here. include_deleted is admin-only \u2014 the public\nsurface always hides soft-deleted rows.",
+        "description": "Mirrors the public list filters (q/tag) so AdminOffice gets the\nsame query surface here. include_deleted is admin-only \u2014 the public\nsurface always hides soft-deleted rows.",
         "operationId": "list_roles_api_admin_roles_get",
         "parameters": [
           {
@@ -510,22 +485,6 @@
                 }
               ],
               "title": "Tag"
-            }
-          },
-          {
-            "in": "query",
-            "name": "kind",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Kind"
             }
           },
           {
@@ -983,22 +942,6 @@
                 }
               ],
               "title": "Tag"
-            }
-          },
-          {
-            "in": "query",
-            "name": "kind",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Kind"
             }
           },
           {

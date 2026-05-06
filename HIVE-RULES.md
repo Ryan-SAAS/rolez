@@ -15,11 +15,24 @@
 - **Key Contacts**:
   - `ryan-hiveorch-api` — tech.saac / hiveorchweb counterpart. Ships `rolez_slug` integration in commit bc8c1397. Future MCP tool changes that affect rolez surface will be coordinated via DM here.
 
-## Deliverables landed (this session)
-- Dropped `app/provisioner.py`, `ProvisionEvent` model + migration (`0002_drop_provision_events`), `app/clients/techsaac.py`, `validate_hive_name`, `ProvisionIn/Out/EventOut` schemas, `/api/v1/.../provision` endpoint, `provision` command from both CLIs, `docs/PROVISIONER-V0.2-PLAN.md`.
-- Added `POST /api/admin/roles/validate` — dry-run validate-and-resolve, returns 200 + pinned manifest preview, no DB write. (For tech.saac AdminOffice Phase 3 AI-assisted editing.)
-- Added `?limit` (default 50, max 200) + `?offset` (default 0) on `GET /api/v1/roles`.
-- Slimmed `tests-integration/test_techsaac_contract.py` to just the auth probe + a tools/call transport sanity check. No more EXPECTED_TOOLS dict — rolez calls no business-logic MCP tools.
+## Manifest shape (v0.2.0)
+
+```json
+{
+  "image":     { "ref": "saac/x", "version": "1.0.0" },
+  "skills":    [{ "name": "...", "version": "1.0.0" }],
+  "subagents": [{ "name": "...", "version": "0.5.0" }],
+  "context":   "..."
+}
+```
+
+Top-level role row has `slug`, `display_name`, `description`, `tags`. No `identity` block, no `kind`, no `context_files` array — all dropped in 0.2.0 per Ryan's UI simplification.
+
+## Recent deliverables
+- **0.2.0 schema cut**: dropped `manifest.identity`, `role.kind` column, `manifest.context_files` array. Replaced context_files with singular `manifest.context: str`. Migration 0003 flattens existing rows (extracts `context_files[name='CLAUDE.md'].content` → new `context` field, drops the rest).
+- POST /api/admin/roles/validate — dry-run validate-and-resolve.
+- Pagination on GET /api/v1/roles + GET /api/admin/roles.
+- Provisioning was removed in 0.1.x — done by tech.saac via `create_agent --rolez_slug`.
 
 ## HIVE Protocol Reminders
 - Poll HIVE after completing tasks

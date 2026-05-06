@@ -68,7 +68,6 @@ def _to_role_out(r: RoleTemplate) -> RoleOut:
         slug=r.slug,
         display_name=r.display_name,
         description=r.description,
-        kind=r.kind,
         tags=list(r.tags or []),
         latest_version=latest.version if latest else None,
         versions_count=len(r.versions),
@@ -83,14 +82,11 @@ async def list_roles(
     _token: Annotated[str, Depends(require_caller_token)],
     session: AsyncSession = Depends(get_session),
     tag: str | None = Query(default=None),
-    kind: str | None = Query(default=None),
     q: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> RoleListOut:
     stmt = _select_role_with_versions().where(RoleTemplate.deleted_at.is_(None))
-    if kind:
-        stmt = stmt.where(RoleTemplate.kind == kind)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(RoleTemplate.slug.ilike(like), RoleTemplate.description.ilike(like)))

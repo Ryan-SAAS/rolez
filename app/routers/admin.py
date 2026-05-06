@@ -51,7 +51,6 @@ def _to_role_out(r: RoleTemplate) -> RoleOut:
         slug=r.slug,
         display_name=r.display_name,
         description=r.description,
-        kind=r.kind,
         tags=list(r.tags or []),
         latest_version=latest.version if latest else None,
         versions_count=len(r.versions),
@@ -75,19 +74,16 @@ async def list_roles(
     session: AsyncSession = Depends(get_session),
     include_deleted: bool = Query(default=False),
     tag: str | None = Query(default=None),
-    kind: str | None = Query(default=None),
     q: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> RoleListOut:
-    """Mirrors the public list filters (q/tag/kind) so AdminOffice gets the
+    """Mirrors the public list filters (q/tag) so AdminOffice gets the
     same query surface here. include_deleted is admin-only — the public
     surface always hides soft-deleted rows."""
     stmt = _select_role_with_versions().order_by(RoleTemplate.slug)
     if not include_deleted:
         stmt = stmt.where(RoleTemplate.deleted_at.is_(None))
-    if kind:
-        stmt = stmt.where(RoleTemplate.kind == kind)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(RoleTemplate.slug.ilike(like), RoleTemplate.description.ilike(like)))
@@ -181,7 +177,6 @@ async def create_role(
             slug=body.slug,
             display_name=body.display_name,
             description=body.description,
-            kind=body.kind or "agent",
             tags=list(body.tags or []),
         )
         session.add(role)
@@ -190,10 +185,6 @@ async def create_role(
     else:
         role.display_name = body.display_name or role.display_name
         role.description = body.description or role.description
-        # Only overwrite kind if the caller actually supplied one. Default
-        # "agent" must never silently flip an existing kind="assistant" row.
-        if body.kind is not None:
-            role.kind = body.kind
         if body.tags:
             role.tags = list(body.tags)
         role.deleted_at = None

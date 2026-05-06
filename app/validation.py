@@ -134,61 +134,18 @@ class ImageRefDraft(BaseModel):
         return _validate_resolvable_version_field(v)
 
 
-# ---- Sub-blocks ---------------------------------------------------------
-
-
-class Identity(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    name: str
-    icon: str | None = None
-    tone: str | None = None
-    description: str | None = None
-
-
-class ContextFile(BaseModel):
-    """A single context file the role contributes. Mapped at provision time
-    to tech.saac's update_agent_context shape:
-      - name == "CLAUDE.md"        → claude_md.content
-      - name == "HIVE-RULES.md"    → hive_rules_md.content
-      - everything else            → custom_files[]
-    """
-
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    content: str
-
-    @field_validator("name")
-    @classmethod
-    def _safe_name(cls, v: str) -> str:
-        if not v:
-            raise ValueError("context_files[].name must be non-empty")
-        if v.startswith("/"):
-            raise ValueError("context_files[].name must be relative")
-        if "\\" in v:
-            raise ValueError("context_files[].name must not contain backslashes")
-        if "\x00" in v:
-            raise ValueError("context_files[].name must not contain NUL")
-        if len(v) >= 2 and v[1] == ":":
-            raise ValueError("context_files[].name must be relative (no drive letter)")
-        parts = v.split("/")
-        if any(p == ".." for p in parts):
-            raise ValueError("context_files[].name must not contain '..' segments")
-        return v
-
-
 # ---- Top-level manifests -----------------------------------------------
 
 
 class _RoleManifestBase(BaseModel):
-    """Rolez owns the recruiting brief: image, identity, skills, subagents,
-    and the role-specific context that gets appended to tech.saac's default.
-    Everything else (tools, prompts, inputs/outputs, integrations,
-    variables, communication rules) is tech.saac's concern, controlled via
-    its admin UI — not part of the role manifest."""
+    """Rolez owns the recruiting brief: image, skills, subagents, and a
+    single `context` string appended to tech.saac's default CLAUDE.md at
+    daemon-config-build time. Everything else (identity, kind, tools,
+    prompts, env vars, integrations, comm rules) is tech.saac's concern
+    and lives in its admin UI — not in the role manifest."""
 
     model_config = ConfigDict(extra="ignore")
-    identity: Identity
-    context_files: list[ContextFile] = Field(default_factory=list)
+    context: str = ""
 
 
 class RoleManifest(_RoleManifestBase):

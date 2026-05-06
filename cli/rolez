@@ -100,8 +100,6 @@ def cmd_list(args: argparse.Namespace) -> int:
     qs = []
     if args.tag:
         qs.append(f"tag={urllib.parse.quote(args.tag)}")
-    if args.kind:
-        qs.append(f"kind={urllib.parse.quote(args.kind)}")
     path = "/api/v1/roles" + (("?" + "&".join(qs)) if qs else "")
     data = _json_get(path)
     items = data.get("items", []) if isinstance(data, dict) else []
@@ -152,15 +150,21 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     if not manifest:
         print(json.dumps(data, indent=2))
         return EXIT_OK
-    print(f"role:      {data.get('slug', name)}@{data.get('latest_version') or version or '?'}")
-    print(f"image:     {manifest['image']['ref']}@{manifest['image']['version']}")
+    print(f"role:    {data.get('slug', name)}@{data.get('latest_version') or version or '?'}")
+    print(f"image:   {manifest['image']['ref']}@{manifest['image']['version']}")
     print("skills:")
     for s in manifest.get("skills", []):
         print(f"  - {s['name']}@{s['version']}")
     print("subagents:")
     for a in manifest.get("subagents", []):
         print(f"  - {a['name']}@{a['version']}")
-    print(f"context_files: {[f['name'] for f in manifest.get('context_files', [])]}")
+    ctx = manifest.get("context", "")
+    if ctx:
+        first_line = ctx.split("\n", 1)[0][:80]
+        nlines = ctx.count("\n") + 1
+        print(f"context: {nlines} line(s), first: {first_line!r}")
+    else:
+        print("context: (empty)")
     return EXIT_OK
 
 
@@ -181,7 +185,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     pl = sub.add_parser("list")
     pl.add_argument("--tag")
-    pl.add_argument("--kind", choices=["agent", "assistant"])
     pl.add_argument("--json", action="store_true")
     pl.set_defaults(func=cmd_list)
 

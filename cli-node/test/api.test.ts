@@ -21,7 +21,7 @@ test("listRoles sends ApiKey header and parses items", async () => {
       url,
       auth: (init?.headers as Record<string, string> | undefined)?.Authorization,
     };
-    return new Response(JSON.stringify({ total: 1, items: [{ slug: "x", latest_version: "1.0.0", kind: "agent", tags: [], versions_count: 1, created_at: "", updated_at: "" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ total: 1, items: [{ slug: "x", latest_version: "1.0.0", tags: [], versions_count: 1, created_at: "", updated_at: "" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   });
   try {
     const out = await listRoles(cfg);
@@ -34,16 +34,15 @@ test("listRoles sends ApiKey header and parses items", async () => {
   }
 });
 
-test("listRoles forwards tag and kind filters", async () => {
+test("listRoles forwards tag filter", async () => {
   let captured = "";
   const restore = mockFetch(async (url) => {
     captured = url;
     return new Response(JSON.stringify({ total: 0, items: [] }), { status: 200 });
   });
   try {
-    await listRoles(cfg, { tag: "support", kind: "agent" });
+    await listRoles(cfg, { tag: "support" });
     assert.ok(captured.includes("tag=support"));
-    assert.ok(captured.includes("kind=agent"));
   } finally {
     restore();
   }
@@ -53,7 +52,7 @@ test("showRole appends /versions/<v> when version supplied", async () => {
   let captured = "";
   const restore = mockFetch(async (url) => {
     captured = url;
-    return new Response(JSON.stringify({ slug: "support-agent", kind: "agent", tags: [], versions_count: 1, latest_version: "0.1.0", versions: [], created_at: "", updated_at: "" }), { status: 200 });
+    return new Response(JSON.stringify({ slug: "support-agent", tags: [], versions_count: 1, latest_version: "0.1.0", versions: [], created_at: "", updated_at: "" }), { status: 200 });
   });
   try {
     await showRole(cfg, "support-agent", "0.1.0");

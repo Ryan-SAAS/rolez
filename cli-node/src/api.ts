@@ -82,11 +82,10 @@ async function request(
 
 export async function listRoles(
   cfg: Config,
-  opts: { tag?: string; kind?: string } = {},
+  opts: { tag?: string } = {},
 ): Promise<RoleListOut> {
   const params = new URLSearchParams();
   if (opts.tag) params.set("tag", opts.tag);
-  if (opts.kind) params.set("kind", opts.kind);
   const qs = params.toString();
   const path = "/api/v1/roles" + (qs ? `?${qs}` : "");
   const resp = await request(cfg, path);

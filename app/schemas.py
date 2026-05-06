@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -14,7 +14,6 @@ class RoleCreateIn(BaseModel):
     slug: str
     display_name: str | None = None
     description: str | None = None
-    kind: Literal["agent", "assistant"] | None = None
     tags: list[str] = Field(default_factory=list)
     manifest: dict[str, Any]
     version: str | None = Field(
@@ -67,7 +66,6 @@ class RoleOut(BaseModel):
     slug: str
     display_name: str | None = None
     description: str | None = None
-    kind: str
     tags: list[str] = Field(default_factory=list)
     latest_version: str | None = None
     versions_count: int = 0

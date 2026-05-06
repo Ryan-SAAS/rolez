@@ -9,14 +9,12 @@ def _draft_body(**overrides) -> dict:
         "slug": "support-agent",
         "display_name": "Support Lead",
         "description": "Handles customer support",
-        "kind": "agent",
         "tags": ["support"],
         "manifest": {
             "image": {"ref": "saac/support-agent", "version": "1.0.0"},
-            "identity": {"name": "Support Lead"},
             "skills": [{"name": "pdf-generator", "version": "latest"}],
             "subagents": [{"name": "code-reviewer", "version": "latest"}],
-            "context_files": [{"name": "CLAUDE.md", "content": "# support\n"}],
+            "context": "# support\nbe customer-minded\n",
         },
     }
     body.update(overrides)
@@ -145,33 +143,23 @@ async def test_admin_show_manifest_null_when_no_versions(client, admin_headers):
 
 
 @respx.mock
-async def test_admin_list_supports_q_tag_kind_filters(client, admin_headers):
+async def test_admin_list_supports_q_and_tag_filters(client, admin_headers):
     _mock_upstreams()
     await client.post("/api/admin/roles", headers=admin_headers, json=_draft_body())  # support
     body2 = _draft_body()
     body2["slug"] = "hr-agent"
     body2["description"] = "human resources role"
     body2["tags"] = ["hr"]
-    body2["kind"] = "agent"
     await client.post("/api/admin/roles", headers=admin_headers, json=body2)
-    body3 = _draft_body()
-    body3["slug"] = "support-assistant"
-    body3["description"] = "support assistant role"
-    body3["kind"] = "assistant"
-    await client.post("/api/admin/roles", headers=admin_headers, json=body3)
 
-    # ?q
+    # ?q matches slug + description
     r = await client.get("/api/admin/roles?q=support", headers=admin_headers)
     slugs = sorted(i["slug"] for i in r.json()["items"])
-    assert slugs == ["support-agent", "support-assistant"]
+    assert slugs == ["support-agent"]
 
-    # ?tag
+    # ?tag matches the tags list
     r = await client.get("/api/admin/roles?tag=hr", headers=admin_headers)
     assert [i["slug"] for i in r.json()["items"]] == ["hr-agent"]
-
-    # ?kind
-    r = await client.get("/api/admin/roles?kind=assistant", headers=admin_headers)
-    assert [i["slug"] for i in r.json()["items"]] == ["support-assistant"]
 
 
 @respx.mock

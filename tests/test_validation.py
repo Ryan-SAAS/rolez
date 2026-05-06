@@ -67,10 +67,9 @@ def test_subagentref_pinned_only():
 def _full_manifest() -> dict:
     return {
         "image": {"ref": "saac/support-agent", "version": "1.4.0"},
-        "identity": {"name": "Support Lead", "icon": "🎧", "tone": "calm", "description": "..."},
         "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
         "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
-        "context_files": [{"name": "CLAUDE.md", "content": "# Support role\n"}],
+        "context": "# Support role\nbe customer-minded\n",
     }
 
 
@@ -78,43 +77,36 @@ def test_role_manifest_round_trips():
     m = RoleManifest(**_full_manifest())
     assert m.image.ref == "saac/support-agent"
     assert m.skills[0].name == "pdf-generator"
-    assert m.context_files[0].name == "CLAUDE.md"
+    assert "Support role" in m.context
+
+
+def test_role_manifest_context_defaults_to_empty():
+    body = {
+        "image": {"ref": "saac/support-agent", "version": "1.4.0"},
+        "skills": [],
+        "subagents": [],
+    }
+    m = RoleManifest(**body)
+    assert m.context == ""
 
 
 def test_role_manifest_ignores_legacy_fields():
-    """Old persisted manifests may carry tools/mcp_servers/etc. We just
-    ignore them so existing rows keep deserialising cleanly."""
+    """Old persisted manifests carry identity/context_files/kind/tools/etc.
+    The migration flattens them, but in case anything slips through we
+    still want to deserialise cleanly (`extra='ignore'`)."""
     body = {
         **_full_manifest(),
+        "identity": {"name": "Old Identity"},
+        "context_files": [{"name": "CLAUDE.md", "content": "..."}],
         "tools": {"allow": ["Read"], "disallow": []},
         "mcp_servers": ["tech-saac"],
         "prompts": [],
-        "communication_rules": {"can_dm": ["x"]},
     }
     m = RoleManifest(**body)
     assert m.image.ref == "saac/support-agent"
+    assert not hasattr(m, "identity")
+    assert not hasattr(m, "context_files")
     assert not hasattr(m, "tools")
-
-
-def test_context_files_reject_path_traversal():
-    bad = _full_manifest()
-    bad["context_files"] = [{"name": "../escape.md", "content": "x"}]
-    with pytest.raises(ValidationError):
-        RoleManifest(**bad)
-
-
-def test_context_files_reject_absolute_paths():
-    bad = _full_manifest()
-    bad["context_files"] = [{"name": "/etc/passwd", "content": "x"}]
-    with pytest.raises(ValidationError):
-        RoleManifest(**bad)
-
-
-def test_context_files_require_non_empty_name():
-    bad = _full_manifest()
-    bad["context_files"] = [{"name": "", "content": "x"}]
-    with pytest.raises(ValidationError):
-        RoleManifest(**bad)
 
 
 def test_role_manifest_draft_allows_latest_for_skills():

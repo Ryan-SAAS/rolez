@@ -10,14 +10,12 @@ def _draft_body(slug: str = "support-agent", **overrides) -> dict:
         "slug": slug,
         "display_name": slug,
         "description": f"role {slug}",
-        "kind": "agent",
         "tags": ["support"],
         "manifest": {
             "image": {"ref": f"saac/{slug}", "version": "1.0.0"},
-            "identity": {"name": slug},
             "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
             "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
-            "context_files": [],
+            "context": "",
         },
     }
     body.update(overrides)

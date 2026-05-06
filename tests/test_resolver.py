@@ -14,18 +14,9 @@ def _draft(**overrides) -> RoleManifestDraft:
     calls in tests that aren't testing the relevant resolver path."""
     body = {
         "image": {"ref": "saac/support-agent", "version": "1.0.0"},
-        "identity": {"name": "Support Lead"},
         "skills": [],
         "subagents": [],
-        "tools": {"allow": [], "disallow": []},
-        "mcp_servers": [],
-        "prompts": [],
-        "inputs": [],
-        "outputs": [],
-        "consumed_integrations": [],
-        "required_variables": [],
-        "communication_rules": {"can_dm": [], "receives_dm": [], "listens_to": [], "posts_to": []},
-        "context_files": [],
+        "context": "",
     }
     body.update(overrides)
     return RoleManifestDraft(**body)

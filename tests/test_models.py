@@ -26,7 +26,6 @@ async def test_create_role_template_with_version(session):
         slug="support-agent",
         display_name="Support Lead",
         description="Handles customer support",
-        kind="agent",
         tags=["support", "customer-facing"],
     )
     session.add(role)
@@ -36,7 +35,7 @@ async def test_create_role_template_with_version(session):
         role_template_id=role.id,
         version="0.1.0",
         manifest_sha256="a" * 64,
-        manifest={"image": {"ref": "saac/support-agent", "version": "1.0.0"}},
+        manifest={"image": {"ref": "saac/support-agent", "version": "1.0.0"}, "context": ""},
         created_by="bootstrap",
     )
     session.add(version)
@@ -44,7 +43,6 @@ async def test_create_role_template_with_version(session):
 
     fetched = (await session.execute(select(RoleTemplate).where(RoleTemplate.slug == "support-agent"))).scalar_one()
     assert fetched.display_name == "Support Lead"
-    assert fetched.kind == "agent"
     assert "support" in fetched.tags
 
     fv = (await session.execute(select(RoleTemplateVersion))).scalar_one()
@@ -53,7 +51,7 @@ async def test_create_role_template_with_version(session):
 
 
 async def test_role_template_version_unique_per_slug(session):
-    role = RoleTemplate(slug="dup", kind="agent", tags=[])
+    role = RoleTemplate(slug="dup", tags=[])
     session.add(role)
     await session.flush()
 

@@ -13,8 +13,7 @@ const USAGE = `rolez — agent-side CLI for the rolez role catalogue
 usage: rolez <command> [options]
 
 commands:
-  list [--tag <t>] [--kind agent|assistant] [--json]
-                                    list available roles
+  list [--tag <t>] [--json]         list available roles
   search <query> [--json]           full-text search over slug + description
   show <slug>[@version]             show role manifest (resolved skills/subagents/image)
   inspect <slug>[@version]          show + summarise referenced parts
@@ -44,14 +43,13 @@ async function cmdList(args: string[]): Promise<number> {
     args,
     options: {
       tag: { type: "string" },
-      kind: { type: "string" },
       json: { type: "boolean" },
     },
     strict: true,
     allowPositionals: false,
   });
   const cfg = loadConfig();
-  const data = await listRoles(cfg, { tag: values.tag, kind: values.kind });
+  const data = await listRoles(cfg, { tag: values.tag });
   if (values.json) {
     process.stdout.write(JSON.stringify(data.items, null, 2) + "\n");
     return EXIT_OK;
@@ -122,14 +120,20 @@ async function cmdInspect(args: string[]): Promise<number> {
     process.stdout.write(JSON.stringify(data, null, 2) + "\n");
     return EXIT_OK;
   }
-  console.log(`role:          ${data.slug}@${data.latest_version ?? target.version ?? "?"}`);
-  console.log(`image:         ${manifest.image.ref}@${manifest.image.version}`);
+  console.log(`role:    ${data.slug}@${data.latest_version ?? target.version ?? "?"}`);
+  console.log(`image:   ${manifest.image.ref}@${manifest.image.version}`);
   console.log("skills:");
   for (const s of manifest.skills ?? []) console.log(`  - ${s.name}@${s.version}`);
   console.log("subagents:");
   for (const s of manifest.subagents ?? []) console.log(`  - ${s.name}@${s.version}`);
-  const ctxNames = (manifest.context_files ?? []).map((f) => f.name);
-  console.log(`context_files: ${JSON.stringify(ctxNames)}`);
+  const ctx = manifest.context ?? "";
+  if (ctx) {
+    const firstLine = (ctx.split("\n", 1)[0] ?? "").slice(0, 80);
+    const nlines = ctx.split("\n").length;
+    console.log(`context: ${nlines} line(s), first: ${JSON.stringify(firstLine)}`);
+  } else {
+    console.log("context: (empty)");
+  }
   return EXIT_OK;
 }
 

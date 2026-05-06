@@ -65,7 +65,6 @@ async def test_public_show_version_404_when_version_unknown(client, admin_header
 async def test_admin_create_invalid_manifest_422(client, admin_headers):
     bad = {
         "slug": "broken",
-        "kind": "agent",
         "tags": [],
         "manifest": {"image": "not-an-object"},  # schema violation
     }
@@ -126,10 +125,10 @@ async def test_resolver_unknown_skill_error_mapped():
     )
     draft = RoleManifestDraft(
         image={"ref": "saac/x", "version": "1.0.0"},
-        identity={"name": "x"},
+
         skills=[{"name": "missing", "version": "latest"}],
         subagents=[],
-        context_files=[],
+
     )
     with pytest.raises(ResolverError):
         await resolve_draft(draft)
@@ -142,10 +141,10 @@ async def test_resolver_skillz_5xx_error_mapped():
     )
     draft = RoleManifestDraft(
         image={"ref": "saac/x", "version": "1.0.0"},
-        identity={"name": "x"},
+
         skills=[{"name": "x", "version": "latest"}],
         subagents=[],
-        context_files=[],
+
     )
     with pytest.raises(ResolverError) as ei:
         await resolve_draft(draft)
@@ -159,10 +158,10 @@ async def test_resolver_agentz_5xx_marked_as_outage():
     )
     draft = RoleManifestDraft(
         image={"ref": "saac/x", "version": "1.0.0"},
-        identity={"name": "x"},
+
         skills=[],
         subagents=[{"name": "y", "version": "latest"}],
-        context_files=[],
+
     )
     with pytest.raises(ResolverError) as ei:
         await resolve_draft(draft)
@@ -188,10 +187,10 @@ async def test_resolver_missing_latest_version_field_errors():
     )
     draft = RoleManifestDraft(
         image={"ref": "saac/x", "version": "1.0.0"},
-        identity={"name": "x"},
+
         skills=[{"name": "x", "version": "latest"}],
         subagents=[],
-        context_files=[],
+
     )
     with pytest.raises(ResolverError, match="no published versions"):
         await resolve_draft(draft)
@@ -204,10 +203,10 @@ async def test_resolver_agentz_error_mapped():
     )
     draft = RoleManifestDraft(
         image={"ref": "saac/x", "version": "1.0.0"},
-        identity={"name": "x"},
+
         skills=[],
         subagents=[{"name": "missing", "version": "latest"}],
-        context_files=[],
+
     )
     with pytest.raises(ResolverError):
         await resolve_draft(draft)
@@ -220,10 +219,10 @@ async def test_resolver_agentz_missing_latest_version_field_errors():
     )
     draft = RoleManifestDraft(
         image={"ref": "saac/x", "version": "1.0.0"},
-        identity={"name": "x"},
+
         skills=[],
         subagents=[{"name": "y", "version": "latest"}],
-        context_files=[],
+
     )
     with pytest.raises(ResolverError, match="no published versions"):
         await resolve_draft(draft)
@@ -348,13 +347,11 @@ def _admin_seed_body(slug: str = "support-agent") -> dict:
         "slug": slug,
         "display_name": slug,
         "description": f"role {slug}",
-        "kind": "agent",
         "tags": [],
         "manifest": {
             "image": {"ref": f"saac/{slug}", "version": "1.0.0"},
-            "identity": {"name": slug},
             "skills": [],
             "subagents": [],
-            "context_files": [],
+            "context": "",
         },
     }

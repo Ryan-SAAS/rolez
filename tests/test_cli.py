@@ -115,7 +115,7 @@ def test_cli_search(cli, capsys):
 
 
 def test_cli_inspect_renders_summary(cli, capsys):
-    """`inspect` must print image, skills, subagents, context_files names."""
+    """`inspect` must print image, skills, subagents, and a context preview."""
     body = {
         "slug": "support-agent",
         "latest_version": "0.1.0",
@@ -123,7 +123,7 @@ def test_cli_inspect_renders_summary(cli, capsys):
             "image": {"ref": "saac/support-agent", "version": "1.4.0"},
             "skills": [{"name": "pdf-generator", "version": "1.2.3"}],
             "subagents": [{"name": "code-reviewer", "version": "0.5.0"}],
-            "context_files": [{"name": "CLAUDE.md", "content": "..."}],
+            "context": "# Support role\nbe customer-minded\n",
         },
     }
     with patch("urllib.request.urlopen", return_value=_mock_resp(200, body)):
@@ -133,7 +133,7 @@ def test_cli_inspect_renders_summary(cli, capsys):
     assert "saac/support-agent@1.4.0" in out
     assert "pdf-generator@1.2.3" in out
     assert "code-reviewer@0.5.0" in out
-    assert "CLAUDE.md" in out
+    assert "Support role" in out  # context preview shows first line
 
 
 def test_cli_inspect_falls_back_to_raw_when_manifest_missing(cli, capsys):

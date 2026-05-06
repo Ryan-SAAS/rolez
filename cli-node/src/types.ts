@@ -9,7 +9,6 @@ export interface RoleSummary {
   readonly slug: string;
   readonly display_name?: string | null;
   readonly description?: string | null;
-  readonly kind: string;
   readonly tags: readonly string[];
   readonly latest_version: string | null;
   readonly versions_count: number;
@@ -33,30 +32,17 @@ export interface ImageRef {
   readonly version: string;
 }
 
-export interface Identity {
-  readonly name: string;
-  readonly icon?: string | null;
-  readonly tone?: string | null;
-  readonly description?: string | null;
-}
-
-export interface ContextFile {
-  readonly name: string;
-  readonly content: string;
-}
-
 /**
- * Rolez owns the recruiting brief: image, identity, skills, subagents,
- * and the role-specific context appended to tech.saac's default.
- * Everything else (tools, prompts, inputs/outputs, integrations, variables,
- * communication rules) is tech.saac's concern, controlled via its admin UI.
+ * Rolez owns the recruiting brief: image, skills, subagents, and one
+ * `context` text appended to tech.saac's default CLAUDE.md at
+ * daemon-config-build time. Everything else (identity, kind, tools,
+ * prompts, env vars, integrations, comm rules) is tech.saac's concern.
  */
 export interface RoleManifest {
   readonly image: ImageRef;
-  readonly identity: Identity;
   readonly skills: readonly NamedRef[];
   readonly subagents: readonly NamedRef[];
-  readonly context_files: readonly ContextFile[];
+  readonly context: string;
 }
 
 export interface RoleVersionSummary {

@@ -18,8 +18,8 @@ settings = get_settings()
 
 app = FastAPI(
     title="rolez",
-    description="Role registry + provisioner for the startanaicompany.com agent fleet.",
-    version="0.1.0",
+    description="Role catalogue for the startanaicompany.com agent fleet.",
+    version="0.2.0",
 )
 
 app.add_middleware(
