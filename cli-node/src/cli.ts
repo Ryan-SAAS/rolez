@@ -4,9 +4,10 @@ import { parseArgs } from "node:util";
 import { listRoles, searchRoles, showRole } from "./api.js";
 import { loadConfig } from "./config.js";
 import { EXIT_OK, EXIT_USAGE, die } from "./errors.js";
+import { applyTlsTrustPolicy } from "./tls-trust.js";
 import type { RoleManifest, RoleSummary } from "./types.js";
 
-const VERSION = "0.3.2";
+const VERSION = "0.3.3";
 
 const USAGE = `rolez — agent-side CLI for the rolez role catalogue
 
@@ -146,6 +147,7 @@ const COMMANDS: Record<string, (args: string[]) => Promise<number>> = {
 };
 
 async function main(): Promise<void> {
+  applyTlsTrustPolicy();
   const [cmd, ...rest] = process.argv.slice(2);
   if (!cmd || cmd === "-h" || cmd === "--help" || cmd === "help") {
     process.stdout.write(USAGE);

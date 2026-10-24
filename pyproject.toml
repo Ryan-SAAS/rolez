@@ -12,6 +12,10 @@ dependencies = [
   "pydantic>=2.9",
   "pydantic-settings>=2.6",
   "httpx>=0.27",
+  # Floor only: even certifi 2026.10.23 still ships "emSign Root CA - G1".
+  # The real eMudhra mitigation is the Dockerfile (cleaned OS bundle + SSL_CERT_FILE);
+  # outside that image httpx still trusts G1 via certifi.
+  "certifi>=2026.10.19",
   "packaging>=24.2",
 ]
 
